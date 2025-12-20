@@ -75,16 +75,45 @@ export function SwipeCard({ lead, onSwipe, onSuperLike, isActive }: SwipeCardPro
     return { ofLinks, hasOF, hasTracking, linktreeLinks, hasLinktree, socialLinks, hasSocials, allLinks: links, bioIndicatesOF };
   }, [lead.extracted_links, lead.bio, lead.reddit_posts, lead.reddit_username]);
 
-  // Get unique media for the grid
+  // Get unique media - show up to 12 images
   const mediaUrls = useMemo(() => {
     if (!lead.reddit_posts) return [];
     const allUrls = lead.reddit_posts.flatMap(p => p.media_urls || []);
     const unique = [...new Set(allUrls)];
+    // Shuffle for variety
     for (let i = unique.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [unique[i], unique[j]] = [unique[j], unique[i]];
     }
-    return unique.slice(0, 6);
+    return unique.slice(0, 12);
+  }, [lead.reddit_posts]);
+
+  // Preload images for faster viewing
+  useEffect(() => {
+    mediaUrls.forEach((url) => {
+      const img = new Image();
+      img.src = url;
+    });
+  }, [mediaUrls]);
+
+  // Calculate carousel pages (3 images per page)
+  const IMAGES_PER_PAGE = 3;
+  const totalPages = Math.ceil(mediaUrls.length / IMAGES_PER_PAGE);
+  const currentPageImages = mediaUrls.slice(
+    carouselIndex * IMAGES_PER_PAGE, 
+    (carouselIndex + 1) * IMAGES_PER_PAGE
+  );
+
+  // Get unique subreddits where this lead was found
+  const foundInSubreddits = useMemo(() => {
+    if (!lead.reddit_posts) return [];
+    const subs = new Set<string>();
+    lead.reddit_posts.forEach(post => {
+      if (post.subreddit_name) {
+        subs.add(post.subreddit_name);
+      }
+    });
+    return Array.from(subs).sort();
   }, [lead.reddit_posts]);
 
   // Stats calculations
@@ -150,6 +179,9 @@ export function SwipeCard({ lead, onSwipe, onSuperLike, isActive }: SwipeCardPro
     }
   };
 
+  // Track which image in lightbox
+  const [lightboxImageIndex, setLightboxImageIndex] = useState(0);
+
   // Keyboard controls
   useEffect(() => {
     if (!isActive) return;
@@ -159,31 +191,31 @@ export function SwipeCard({ lead, onSwipe, onSuperLike, isActive }: SwipeCardPro
       if (lightboxOpen) {
         if (e.key === "Escape") {
           setLightboxOpen(false);
-        } else if (e.key === "ArrowLeft" && carouselIndex > 0) {
-          setCarouselIndex(carouselIndex - 1);
-        } else if (e.key === "ArrowRight" && carouselIndex < mediaUrls.length - 1) {
-          setCarouselIndex(carouselIndex + 1);
+        } else if (e.key === "ArrowLeft" && lightboxImageIndex > 0) {
+          setLightboxImageIndex(lightboxImageIndex - 1);
+        } else if (e.key === "ArrowRight" && lightboxImageIndex < mediaUrls.length - 1) {
+          setLightboxImageIndex(lightboxImageIndex + 1);
         }
         return;
       }
       
-      // Card swipe controls - A/D for swipe, arrows for carousel
+      // Card swipe controls - A/D for swipe, arrows for page navigation
       if (e.key === "a") {
         handleButtonSwipe("left");
       } else if (e.key === "d") {
         handleButtonSwipe("right");
       } else if (e.key === "ArrowUp" || e.key === "w" || e.key === "s") {
         handleSuperLike();
-      } else if (e.key === "ArrowLeft" && mediaUrls.length > 0) {
+      } else if (e.key === "ArrowLeft" && totalPages > 1) {
         setCarouselIndex(prev => Math.max(0, prev - 1));
-      } else if (e.key === "ArrowRight" && mediaUrls.length > 0) {
-        setCarouselIndex(prev => Math.min(mediaUrls.length - 1, prev + 1));
+      } else if (e.key === "ArrowRight" && totalPages > 1) {
+        setCarouselIndex(prev => Math.min(totalPages - 1, prev + 1));
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isActive, lightboxOpen, carouselIndex, mediaUrls.length, onSuperLike]);
+  }, [isActive, lightboxOpen, lightboxImageIndex, carouselIndex, mediaUrls.length, totalPages, onSuperLike]);
 
   const exitVariants = {
     left: { x: -500, rotate: -30, opacity: 0, transition: { duration: 0.4, ease: "easeOut" } },
@@ -225,62 +257,86 @@ export function SwipeCard({ lead, onSwipe, onSuperLike, isActive }: SwipeCardPro
 
           {/* Content area - no scrolling needed now */}
           <div onPointerDownCapture={(e) => e.stopPropagation()}>
-            {/* Compact Media Carousel */}
+            {/* 3-Image Carousel */}
             {mediaUrls.length > 0 ? (
-              <div className="relative bg-black/40">
-                {/* Main carousel image - click to open lightbox */}
-                <button
-                  onClick={() => setLightboxOpen(true)}
-                  className="w-full aspect-[16/9] overflow-hidden cursor-pointer group"
-                >
-                  <img
-                    src={mediaUrls[carouselIndex]}
-                    alt={`Preview ${carouselIndex + 1}`}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  />
-                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
-                </button>
-
-                {/* Carousel navigation arrows */}
-                {carouselIndex > 0 && (
-                  <button
-                    onClick={() => setCarouselIndex(carouselIndex - 1)}
-                    className="absolute left-2 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/50 hover:bg-black/70 transition-colors"
-                  >
-                    <ChevronLeft size={20} className="text-white" />
-                  </button>
-                )}
-                {carouselIndex < mediaUrls.length - 1 && (
-                  <button
-                    onClick={() => setCarouselIndex(carouselIndex + 1)}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/50 hover:bg-black/70 transition-colors"
-                  >
-                    <ChevronRight size={20} className="text-white" />
-                  </button>
-                )}
-
-                {/* Dot indicators */}
-                <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-1.5">
-                  {mediaUrls.map((_, i) => (
-                    <button
-                      key={i}
-                      onClick={() => setCarouselIndex(i)}
-                      className={`w-2 h-2 rounded-full transition-all ${
-                        i === carouselIndex 
-                          ? 'bg-white w-4' 
-                          : 'bg-white/40 hover:bg-white/60'
-                      }`}
-                    />
-                  ))}
+              <div className="relative bg-black/30 p-2">
+                {/* 3-image grid */}
+                <div className="grid grid-cols-3 gap-1.5">
+                  {currentPageImages.map((url, i) => {
+                    const globalIndex = carouselIndex * IMAGES_PER_PAGE + i;
+                    return (
+                      <button
+                        key={globalIndex}
+                        onClick={() => {
+                          setLightboxImageIndex(globalIndex);
+                          setLightboxOpen(true);
+                        }}
+                        className="relative aspect-[3/4] overflow-hidden rounded-lg cursor-pointer group bg-muted"
+                      >
+                        <img
+                          src={url}
+                          alt={`Preview ${globalIndex + 1}`}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                          loading="eager"
+                        />
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
+                      </button>
+                    );
+                  })}
+                  {/* Fill empty slots if less than 3 images on last page */}
+                  {currentPageImages.length < IMAGES_PER_PAGE && 
+                    Array(IMAGES_PER_PAGE - currentPageImages.length).fill(0).map((_, i) => (
+                      <div key={`empty-${i}`} className="aspect-[3/4] rounded-lg bg-muted/20" />
+                    ))
+                  }
                 </div>
 
-                {/* Counter badge */}
-                <div className="absolute top-2 right-2 px-2 py-1 rounded-full bg-black/50 text-white text-xs font-medium">
-                  {carouselIndex + 1} / {mediaUrls.length}
+                {/* Page navigation - only show if multiple pages */}
+                {totalPages > 1 && (
+                  <>
+                    {carouselIndex > 0 && (
+                      <button
+                        onClick={() => setCarouselIndex(carouselIndex - 1)}
+                        className="absolute left-0 top-1/2 -translate-y-1/2 p-1.5 rounded-r-lg bg-black/60 hover:bg-black/80 transition-colors"
+                      >
+                        <ChevronLeft size={18} className="text-white" />
+                      </button>
+                    )}
+                    {carouselIndex < totalPages - 1 && (
+                      <button
+                        onClick={() => setCarouselIndex(carouselIndex + 1)}
+                        className="absolute right-0 top-1/2 -translate-y-1/2 p-1.5 rounded-l-lg bg-black/60 hover:bg-black/80 transition-colors"
+                      >
+                        <ChevronRight size={18} className="text-white" />
+                      </button>
+                    )}
+                  </>
+                )}
+
+                {/* Page indicator & count */}
+                <div className="flex items-center justify-center gap-2 mt-2">
+                  {totalPages > 1 && (
+                    <div className="flex items-center gap-1">
+                      {Array(totalPages).fill(0).map((_, i) => (
+                        <button
+                          key={i}
+                          onClick={() => setCarouselIndex(i)}
+                          className={`w-1.5 h-1.5 rounded-full transition-all ${
+                            i === carouselIndex 
+                              ? 'bg-white w-3' 
+                              : 'bg-white/40 hover:bg-white/60'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  )}
+                  <span className="text-[10px] text-white/60">
+                    {mediaUrls.length} photos
+                  </span>
                 </div>
               </div>
             ) : (
-              <div className="h-24 bg-gradient-to-br from-primary/20 via-accent/20 to-purple-500/20 flex items-center justify-center">
+              <div className="h-20 bg-gradient-to-br from-primary/20 via-accent/20 to-purple-500/20 flex items-center justify-center">
                 <span className="text-muted-foreground text-sm">No media available</span>
               </div>
             )}
@@ -390,6 +446,28 @@ export function SwipeCard({ lead, onSwipe, onSuperLike, isActive }: SwipeCardPro
                   </div>
                 </div>
               </div>
+
+              {/* Found in subreddits */}
+              {foundInSubreddits.length > 0 && (
+                <div className="flex flex-col gap-1.5">
+                  <div className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">
+                    Found in {foundInSubreddits.length} sub{foundInSubreddits.length > 1 ? 's' : ''}
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {foundInSubreddits.map((subName) => (
+                      <a
+                        key={subName}
+                        href={`https://reddit.com/r/${subName}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-2 py-1 rounded-md bg-primary/10 text-primary text-xs font-medium hover:bg-primary/20 transition-colors border border-primary/20"
+                      >
+                        r/{subName}
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Bio */}
               {lead.bio && (
@@ -515,26 +593,26 @@ export function SwipeCard({ lead, onSwipe, onSuperLike, isActive }: SwipeCardPro
 
             {/* Image counter */}
             <div className="absolute top-4 left-4 text-white/80 text-sm font-medium bg-black/40 px-3 py-1 rounded-full">
-              {carouselIndex + 1} / {mediaUrls.length}
+              {lightboxImageIndex + 1} / {mediaUrls.length}
             </div>
 
             {/* Navigation arrows */}
-            {carouselIndex > 0 && (
+            {lightboxImageIndex > 0 && (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  setCarouselIndex(carouselIndex - 1);
+                  setLightboxImageIndex(lightboxImageIndex - 1);
                 }}
                 className="absolute left-4 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white/20 hover:bg-white/30 transition-colors"
               >
                 <ChevronLeft size={32} className="text-white" />
               </button>
             )}
-            {carouselIndex < mediaUrls.length - 1 && (
+            {lightboxImageIndex < mediaUrls.length - 1 && (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  setCarouselIndex(carouselIndex + 1);
+                  setLightboxImageIndex(lightboxImageIndex + 1);
                 }}
                 className="absolute right-4 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white/20 hover:bg-white/30 transition-colors"
               >
@@ -544,12 +622,12 @@ export function SwipeCard({ lead, onSwipe, onSuperLike, isActive }: SwipeCardPro
 
             {/* Main image */}
             <motion.img
-              key={carouselIndex}
+              key={lightboxImageIndex}
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              src={mediaUrls[carouselIndex]}
-              alt={`Full preview ${carouselIndex + 1}`}
+              src={mediaUrls[lightboxImageIndex]}
+              alt={`Full preview ${lightboxImageIndex + 1}`}
               className="max-h-[90vh] max-w-[90vw] object-contain rounded-lg"
               onClick={(e) => e.stopPropagation()}
             />

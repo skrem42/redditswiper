@@ -45,9 +45,9 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   
-  // Subreddit filtering
+  // Subreddit filtering - multi-select exclusion
   const [subreddits, setSubreddits] = useState<Subreddit[]>([]);
-  const [selectedSubreddit, setSelectedSubreddit] = useState<Subreddit | null>(null);
+  const [excludedSubreddits, setExcludedSubreddits] = useState<Set<string>>(new Set());
   const [subredditPendingCounts, setSubredditPendingCounts] = useState<Record<string, number>>({});
 
   // Fetch subreddits
@@ -56,7 +56,7 @@ export default function Home() {
       const data = await getSubreddits();
       setSubreddits(data);
       
-      // Calculate pending counts per subreddit
+      // Calculate pending counts per subreddit (using subreddit_name now)
       const { supabase } = await import("@/lib/supabase");
       const counts: Record<string, number> = {};
       
@@ -64,7 +64,7 @@ export default function Home() {
         const { data: posts } = await supabase
           .from("reddit_posts")
           .select("lead_id")
-          .eq("subreddit_id", sub.id);
+          .eq("subreddit_name", sub.name); // Use name instead of id
         
         if (posts) {
           const leadIds = [...new Set(posts.map((p) => p.lead_id))];
@@ -84,32 +84,63 @@ export default function Home() {
     }
   }, []);
 
-  // Fetch leads based on current filter and selected subreddit
+  // Fetch leads based on current filter and excluded subreddits
   const fetchLeads = useCallback(async () => {
     setIsLoading(true);
     try {
       let data: RedditLead[];
       
-      if (selectedSubreddit) {
-        // Filter by subreddit
-        data = await getLeadsBySubreddit(selectedSubreddit.id, currentFilter, 50);
-      } else if (currentFilter === "pending") {
-        data = await getPendingLeads(50);
+      if (currentFilter === "pending") {
+        data = await getPendingLeads(100); // Fetch more to filter
       } else if (currentFilter === "contacted") {
-        // Special filter for contacted leads (across all statuses)
-        data = await getContactedLeads(50);
+        data = await getContactedLeads(100);
       } else {
-        data = await getLeadsByStatus(currentFilter, 50);
+        data = await getLeadsByStatus(currentFilter, 100);
       }
       
-      setLeads(data);
+      // Filter out leads from excluded subreddits
+      if (excludedSubreddits.size > 0 && data.length > 0) {
+        // Get subreddit IDs for each lead's posts
+        const { supabase } = await import("@/lib/supabase");
+        
+        // For each lead, check if ALL their posts are from excluded subreddits
+        const filteredData: RedditLead[] = [];
+        
+        for (const lead of data) {
+          // Get subreddit IDs from this lead's posts
+          const leadSubredditIds = new Set(
+            (lead.reddit_posts || [])
+              .map(p => p.subreddit_id)
+              .filter(Boolean) as string[]
+          );
+          
+          // If lead has no posts with subreddit info, include them
+          if (leadSubredditIds.size === 0) {
+            filteredData.push(lead);
+            continue;
+          }
+          
+          // Check if at least one post is from a non-excluded subreddit
+          const hasNonExcludedPost = Array.from(leadSubredditIds).some(
+            subId => !excludedSubreddits.has(subId)
+          );
+          
+          if (hasNonExcludedPost) {
+            filteredData.push(lead);
+          }
+        }
+        
+        data = filteredData;
+      }
+      
+      setLeads(data.slice(0, 50)); // Limit final results
       setCurrentIndex(0);
     } catch (error) {
       console.error("Error fetching leads:", error);
     } finally {
       setIsLoading(false);
     }
-  }, [currentFilter, selectedSubreddit]);
+  }, [currentFilter, excludedSubreddits]);
 
   // Fetch stats
   const fetchStats = useCallback(async () => {
@@ -142,10 +173,10 @@ export default function Home() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [currentFilter, swipeHistory.length]);
 
-  // Refetch when filter or subreddit changes
+  // Refetch when filter or exclusions change
   useEffect(() => {
     fetchLeads();
-  }, [currentFilter, selectedSubreddit, fetchLeads]);
+  }, [currentFilter, excludedSubreddits, fetchLeads]);
 
   // Handle swipe
   const handleSwipe = async (direction: "left" | "right") => {
@@ -302,16 +333,16 @@ export default function Home() {
         <div className="flex items-center gap-4">
           <SubredditSelector
             subreddits={subreddits}
-            selectedSubreddit={selectedSubreddit}
-            onSelect={(sub) => {
-              setSelectedSubreddit(sub);
-              setSwipeHistory([]); // Clear undo history when switching
+            excludedSubreddits={excludedSubreddits}
+            onExclusionChange={(excluded) => {
+              setExcludedSubreddits(excluded);
+              setSwipeHistory([]); // Clear undo history when filter changes
             }}
             pendingCounts={subredditPendingCounts}
           />
-          {selectedSubreddit && (
+          {excludedSubreddits.size > 0 && (
             <span className="text-sm text-muted-foreground">
-              Filtering leads from r/{selectedSubreddit.name}
+              Hiding {excludedSubreddits.size} subreddit{excludedSubreddits.size > 1 ? "s" : ""}
             </span>
           )}
         </div>

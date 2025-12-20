@@ -1,114 +1,40 @@
-[00:00:01.140] Server  LOG     ✓ Ready in 852ms
-[00:00:12.258] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[03:28:07.247] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[03:28:08.140] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[03:36:45.746] Server  LOG     ✓ Compiled in 14ms
-[03:36:46.618] Browser WARN    GoTrueClient@sb-jmchmbwhnmlednaycxqh-auth-token:1 (2.89.0) 2025-12-20T16:48:33.436Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key.
-[03:37:04.037] Server  LOG     ✓ Compiled in 52ms
-[03:37:04.619] Browser WARN    GoTrueClient@sb-jmchmbwhnmlednaycxqh-auth-token:2 (2.89.0) 2025-12-20T16:48:51.725Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key.
-[03:37:26.386] Server  LOG     ✓ Compiled in 1541ms
-[03:39:36.994] Server  LOG     ✓ Compiled in 215ms
-[03:39:55.430] Server  LOG     ✓ Compiled in 66ms
-[03:40:01.318] Browser WARN    Unexpected import of module [project]/Desktop/redditscraper/frontend/src/lib/supabase.ts [app-client] (ecmascript, async loader) from module [project]/Desktop/redditscraper/frontend/src/app/page.tsx [app-client] (ecmascript), which was deleted by an HMR update
-[03:40:01.318] Browser WARN    Unexpected import of module [project]/Desktop/redditscraper/frontend/src/lib/supabase.ts [app-client] (ecmascript) from module [project]/Desktop/redditscraper/frontend/src/app/page.tsx [app-client] (ecmascript), which was deleted by an HMR update
-[03:40:04.305] Server  LOG     ✓ Compiled in 38ms
-[03:40:19.154] Server  LOG     ✓ Compiled in 288ms
-[03:40:32.673] Server  LOG     ✓ Compiled in 78ms
-[03:40:33.090] Browser WARN    Unexpected import of module [project]/Desktop/redditscraper/frontend/src/lib/supabase.ts [app-client] (ecmascript, async loader) from module [project]/Desktop/redditscraper/frontend/src/app/page.tsx [app-client] (ecmascript), which was deleted by an HMR update
-[03:40:33.090] Browser WARN    Unexpected import of module [project]/Desktop/redditscraper/frontend/src/lib/supabase.ts [app-client] (ecmascript) from module [project]/Desktop/redditscraper/frontend/src/app/page.tsx [app-client] (ecmascript), which was deleted by an HMR update
-[03:41:31.639] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[03:43:00.639] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.640] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.640] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.640] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.640] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.640] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.640] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.640] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.641] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.641] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.641] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.641] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.641] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.641] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.641] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.641] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.641] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.641] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.641] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.641] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.641] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.641] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.641] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.641] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.643] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.646] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.646] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.646] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.646] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.646] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.646] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.646] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.646] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.646] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.646] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.646] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.646] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.646] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.646] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.646] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:43:00.646] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[03:55:50.018] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[04:01:15.925] Server  LOG     ✓ Compiled in 141ms
-[04:01:16.047] Browser ERROR   uncaughtError: ReferenceError: lightboxIndex is not defined
-[04:01:31.959] Server  WARN    ⚠ Fast Refresh had to perform a full reload due to a runtime error.
-[04:01:32.001] Server  LOG     ✓ Compiled in 31ms
-[04:01:32.684] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[04:01:33.793] Browser ERROR   uncaughtError: ReferenceError: lightboxIndex is not defined
-[04:02:00.636] Server  WARN    ⚠ Fast Refresh had to perform a full reload due to a runtime error.
-[04:02:00.732] Server  LOG     ✓ Compiled in 69ms
-[04:02:00.924] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[04:02:02.054] Browser ERROR   uncaughtError: ReferenceError: lightboxIndex is not defined
-[04:02:25.804] Server  WARN    ⚠ Fast Refresh had to perform a full reload due to a runtime error.
-[04:02:25.827] Server  LOG     ✓ Compiled in 47ms
-[04:02:26.136] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:00:01.178] Server  LOG     ✓ Ready in 868ms
+[00:00:07.896] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:04:21.775] Server  LOG     ✓ Compiled in 878ms
+[00:04:51.286] Server  LOG     ✓ Compiled in 107ms
+[00:05:11.726] Server  LOG     ✓ Compiled in 66ms
+[00:05:23.653] Server  LOG     ✓ Compiled in 29ms
+[00:05:49.461] Server  LOG     ✓ Compiled in 83ms
+[00:17:31.000] Server  LOG     ✓ Compiled in 587ms
+[00:17:32.058] Browser ERROR   uncaughtError: TypeError: Cannot read properties of undefined (reading 'size')
+[00:17:42.347] Server  WARN    ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+[00:17:42.495] Server  LOG     ✓ Compiled in 54ms
+[00:17:42.600] Server  ERROR   ⨯ ReferenceError: selectedSubreddit is not defined
+[00:17:42.821] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:17:43.064] Browser ERROR   uncaughtError: ReferenceError: selectedSubreddit is not defined
+[00:18:01.947] Server  WARN    ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+[00:18:01.965] Server  LOG     ✓ Compiled in 125ms
+[00:18:02.367] Server  ERROR   ⨯ ReferenceError: selectedSubreddit is not defined
+[00:18:02.495] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:18:03.059] Browser ERROR   uncaughtError: ReferenceError: selectedSubreddit is not defined
+[00:18:08.066] Server  WARN    ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+[00:18:08.157] Server  LOG     ✓ Compiled in 33ms
+[00:18:08.219] Server  ERROR   ⨯ ReferenceError: selectedSubreddit is not defined
+[00:18:08.383] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:18:09.061] Browser ERROR   uncaughtError: ReferenceError: selectedSubreddit is not defined
+[00:18:20.414] Server  WARN    ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+[00:18:20.430] Server  LOG     ✓ Compiled in 187ms
+[00:18:21.118] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:40:52.882] Server  LOG     ✓ Compiled in 152ms
+[00:40:53.057] Browser WARN    GoTrueClient@sb-jmchmbwhnmlednaycxqh-auth-token:1 (2.89.0) 2025-12-20T18:47:55.705Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key.
+[00:40:59.253] Server  LOG     ✓ Compiled in 10ms
+[00:41:00.075] Browser WARN    GoTrueClient@sb-jmchmbwhnmlednaycxqh-auth-token:2 (2.89.0) 2025-12-20T18:48:02.051Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key.
+[00:41:05.141] Server  LOG     ✓ Compiled in 9ms
+[00:41:06.057] Browser WARN    GoTrueClient@sb-jmchmbwhnmlednaycxqh-auth-token:3 (2.89.0) 2025-12-20T18:48:07.946Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key.
+[00:41:19.338] Server  LOG     ✓ Compiled in 122ms
+[00:41:59.505] Server  LOG     ✓ Compiled in 33ms
+[00:42:13.961] Server  LOG     ✓ Compiled in 30ms
+[00:42:31.705] Server  LOG     ✓ Compiled in 47ms
+[00:42:42.759] Server  LOG     ✓ Compiled in 17ms
+[00:42:43.058] Browser WARN    GoTrueClient@sb-jmchmbwhnmlednaycxqh-auth-token:4 (2.89.0) 2025-12-20T18:49:45.565Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key.
+[00:43:08.009] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold

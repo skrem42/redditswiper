@@ -174,17 +174,29 @@ export interface Subreddit {
 }
 
 export async function getSubreddits(): Promise<Subreddit[]> {
+  // Fetch from subreddit_queue (where crawler puts discovered subs)
+  // Only show completed or processing subs (actively being crawled)
   const { data, error } = await supabase
-    .from("subreddits")
+    .from("subreddit_queue")
     .select("*")
-    .order("name", { ascending: true });
+    .in("status", ["completed", "processing"])
+    .order("subscribers", { ascending: false }); // Biggest subs first
 
   if (error) {
     console.error("Error fetching subreddits:", error);
     return [];
   }
 
-  return data || [];
+  // Map subreddit_queue fields to Subreddit interface
+  // Include status as an extra property for active indicator
+  return (data || []).map(sub => ({
+    id: sub.id,
+    name: sub.subreddit_name,
+    display_name: `r/${sub.subreddit_name}`,
+    subscribers: sub.subscribers || 0,
+    is_nsfw: sub.is_nsfw ?? true,
+    status: sub.status, // Add status for active indicator
+  } as any)); // Cast to any to avoid TS error with extra property
 }
 
 export async function getLeadsBySubreddit(
@@ -193,11 +205,24 @@ export async function getLeadsBySubreddit(
   limit = 50,
   offset = 0
 ): Promise<RedditLead[]> {
-  // Get lead IDs that have posts in this subreddit
+  // subredditId is now from subreddit_queue, need to get subreddit_name
+  const { data: queueSub } = await supabase
+    .from("subreddit_queue")
+    .select("subreddit_name")
+    .eq("id", subredditId)
+    .single();
+
+  if (!queueSub) {
+    return [];
+  }
+
+  const subredditName = queueSub.subreddit_name;
+
+  // Get lead IDs that have posts with this subreddit_name
   const { data: postData, error: postError } = await supabase
     .from("reddit_posts")
     .select("lead_id")
-    .eq("subreddit_id", subredditId);
+    .eq("subreddit_name", subredditName);
 
   if (postError || !postData) {
     console.error("Error fetching posts:", postError);
@@ -232,11 +257,22 @@ export async function getSubredditStats(subredditId: string): Promise<{
   rejected: number;
   superliked: number;
 }> {
-  // Get lead IDs that have posts in this subreddit
+  // subredditId is from subreddit_queue, get subreddit_name
+  const { data: queueSub } = await supabase
+    .from("subreddit_queue")
+    .select("subreddit_name")
+    .eq("id", subredditId)
+    .single();
+
+  if (!queueSub) {
+    return { pending: 0, approved: 0, rejected: 0, superliked: 0 };
+  }
+
+  // Get lead IDs that have posts with this subreddit_name
   const { data: postData } = await supabase
     .from("reddit_posts")
     .select("lead_id")
-    .eq("subreddit_id", subredditId);
+    .eq("subreddit_name", queueSub.subreddit_name);
 
   const leadIds = [...new Set((postData || []).map((p) => p.lead_id))];
 

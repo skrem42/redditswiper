@@ -1,21 +1,21 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { ChevronDown, X, Layers } from "lucide-react";
+import { ChevronDown, Check, Filter, RotateCcw } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Subreddit } from "@/lib/supabase";
 
 interface SubredditSelectorProps {
   subreddits: Subreddit[];
-  selectedSubreddit: Subreddit | null;
-  onSelect: (subreddit: Subreddit | null) => void;
+  excludedSubreddits: Set<string>;
+  onExclusionChange: (excluded: Set<string>) => void;
   pendingCounts?: Record<string, number>;
 }
 
 export function SubredditSelector({
   subreddits,
-  selectedSubreddit,
-  onSelect,
+  excludedSubreddits,
+  onExclusionChange,
   pendingCounts = {},
 }: SubredditSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -45,39 +45,51 @@ export function SubredditSelector({
     return countB - countA;
   });
 
+  const toggleSubreddit = (subId: string) => {
+    const newExcluded = new Set(excludedSubreddits);
+    if (newExcluded.has(subId)) {
+      newExcluded.delete(subId);
+    } else {
+      newExcluded.add(subId);
+    }
+    onExclusionChange(newExcluded);
+  };
+
+  const selectAll = () => {
+    onExclusionChange(new Set());
+  };
+
+  const deselectAll = () => {
+    onExclusionChange(new Set(subreddits.map(s => s.id)));
+  };
+
+  const activeCount = subreddits.length - excludedSubreddits.size;
+  const totalPending = Object.entries(pendingCounts)
+    .filter(([id]) => !excludedSubreddits.has(id))
+    .reduce((sum, [, count]) => sum + count, 0);
+
   return (
     <div className="relative" ref={dropdownRef}>
       {/* Trigger button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
         className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border transition-all ${
-          selectedSubreddit
-            ? "bg-primary/10 border-primary/30 text-primary"
+          excludedSubreddits.size > 0
+            ? "bg-amber-500/10 border-amber-500/30 text-amber-400"
             : "bg-secondary border-border hover:border-primary/30"
         }`}
       >
-        <Layers size={16} />
+        <Filter size={16} />
         <span className="font-medium">
-          {selectedSubreddit ? `r/${selectedSubreddit.name}` : "All Subreddits"}
+          {excludedSubreddits.size > 0 
+            ? `${activeCount}/${subreddits.length} subs` 
+            : "All Subreddits"}
         </span>
         <ChevronDown
           size={16}
           className={`transition-transform ${isOpen ? "rotate-180" : ""}`}
         />
       </button>
-
-      {/* Clear selection button */}
-      {selectedSubreddit && (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onSelect(null);
-          }}
-          className="absolute -right-2 -top-2 p-1 rounded-full bg-destructive text-white hover:bg-destructive/80 transition-colors"
-        >
-          <X size={12} />
-        </button>
-      )}
 
       {/* Dropdown */}
       <AnimatePresence>
@@ -86,10 +98,17 @@ export function SubredditSelector({
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            className="absolute top-full left-0 mt-2 w-72 bg-card border border-border rounded-xl shadow-xl z-50 overflow-hidden"
+            className="absolute top-full left-0 mt-2 w-80 bg-card border border-border rounded-xl shadow-xl z-50 overflow-hidden"
           >
-            {/* Search input */}
-            <div className="p-3 border-b border-border">
+            {/* Header */}
+            <div className="p-3 border-b border-border bg-secondary/30">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium">Filter Subreddits</span>
+                <span className="text-xs text-muted-foreground">
+                  {totalPending} pending in {activeCount} subs
+                </span>
+              </div>
+              {/* Search input */}
               <input
                 type="text"
                 placeholder="Search subreddits..."
@@ -100,53 +119,83 @@ export function SubredditSelector({
               />
             </div>
 
-            {/* Options list */}
-            <div className="max-h-64 overflow-y-auto">
-              {/* All subreddits option */}
+            {/* Quick actions */}
+            <div className="flex items-center gap-2 p-2 border-b border-border">
               <button
-                onClick={() => {
-                  onSelect(null);
-                  setIsOpen(false);
-                  setSearch("");
-                }}
-                className={`w-full px-4 py-3 text-left hover:bg-secondary/50 transition-colors flex items-center justify-between ${
-                  !selectedSubreddit ? "bg-primary/10" : ""
-                }`}
+                onClick={selectAll}
+                className="flex-1 px-3 py-1.5 text-xs font-medium rounded-lg bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 transition-colors"
               >
-                <span className="font-medium">All Subreddits</span>
-                <span className="text-xs text-muted-foreground">
-                  {Object.values(pendingCounts).reduce((a, b) => a + b, 0)} pending
-                </span>
+                Select All
               </button>
+              <button
+                onClick={deselectAll}
+                className="flex-1 px-3 py-1.5 text-xs font-medium rounded-lg bg-destructive/20 text-destructive hover:bg-destructive/30 transition-colors"
+              >
+                Deselect All
+              </button>
+              {excludedSubreddits.size > 0 && (
+                <button
+                  onClick={selectAll}
+                  className="p-1.5 rounded-lg bg-secondary hover:bg-secondary/80 transition-colors"
+                  title="Reset filters"
+                >
+                  <RotateCcw size={14} />
+                </button>
+              )}
+            </div>
 
-              {/* Divider */}
-              <div className="border-t border-border" />
-
-              {/* Subreddit options */}
+            {/* Options list */}
+            <div className="max-h-72 overflow-y-auto">
               {sortedSubreddits.map((sub) => {
                 const count = pendingCounts[sub.id] || 0;
+                const isExcluded = excludedSubreddits.has(sub.id);
+                // Check if sub is being actively crawled (from getSubreddits query that includes processing subs)
+                const isActive = (sub as any).status === "processing";
+                
                 return (
                   <button
                     key={sub.id}
-                    onClick={() => {
-                      onSelect(sub);
-                      setIsOpen(false);
-                      setSearch("");
-                    }}
-                    className={`w-full px-4 py-3 text-left hover:bg-secondary/50 transition-colors flex items-center justify-between ${
-                      selectedSubreddit?.id === sub.id ? "bg-primary/10" : ""
-                    }`}
+                    onClick={() => toggleSubreddit(sub.id)}
+                    className={`w-full px-3 py-2.5 text-left hover:bg-secondary/50 transition-colors flex items-center gap-3 ${
+                      isExcluded ? "opacity-50" : ""
+                    } ${isActive ? "bg-blue-500/10" : ""}`}
                   >
-                    <div>
-                      <span className="font-medium">r/{sub.name}</span>
+                    {/* Checkbox */}
+                    <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 ${
+                      isExcluded 
+                        ? "border-muted-foreground/40 bg-transparent" 
+                        : "border-emerald-500 bg-emerald-500"
+                    }`}>
+                      {!isExcluded && <Check size={12} className="text-white" strokeWidth={3} />}
+                    </div>
+
+                    {/* Subreddit info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className={`font-medium truncate ${isExcluded ? "line-through" : ""}`}>
+                          r/{sub.name}
+                        </span>
+                        {isActive && (
+                          <span className="flex items-center gap-1 px-1.5 py-0.5 bg-blue-500/20 text-blue-400 rounded text-[9px] font-medium">
+                            <span className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse" />
+                            ACTIVE
+                          </span>
+                        )}
+                      </div>
                       {sub.subscribers > 0 && (
-                        <span className="text-xs text-muted-foreground ml-2">
+                        <span className="text-[10px] text-muted-foreground">
                           {sub.subscribers.toLocaleString()} members
                         </span>
                       )}
                     </div>
+
+                    {/* Pending count */}
                     {count > 0 && (
-                      <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 rounded-full text-xs font-medium">
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0 ${
+                        isExcluded 
+                          ? "bg-muted/30 text-muted-foreground" 
+                          : "bg-amber-500/20 text-amber-400"
+                      }`}>
                         {count}
                       </span>
                     )}
@@ -159,6 +208,13 @@ export function SubredditSelector({
                   No subreddits found
                 </div>
               )}
+            </div>
+
+            {/* Footer hint */}
+            <div className="p-2 border-t border-border bg-secondary/20 text-center">
+              <span className="text-[10px] text-muted-foreground">
+                Uncheck subs to hide their leads
+              </span>
             </div>
           </motion.div>
         )}

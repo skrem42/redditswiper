@@ -128,18 +128,38 @@ async function getStats() {
     };
 }
 async function getSubreddits() {
-    const { data, error } = await supabase.from("subreddits").select("*").order("name", {
-        ascending: true
-    });
+    // Fetch from subreddit_queue (where crawler puts discovered subs)
+    // Only show completed or processing subs (actively being crawled)
+    const { data, error } = await supabase.from("subreddit_queue").select("*").in("status", [
+        "completed",
+        "processing"
+    ]).order("subscribers", {
+        ascending: false
+    }); // Biggest subs first
     if (error) {
         console.error("Error fetching subreddits:", error);
         return [];
     }
-    return data || [];
+    // Map subreddit_queue fields to Subreddit interface
+    // Include status as an extra property for active indicator
+    return (data || []).map((sub)=>({
+            id: sub.id,
+            name: sub.subreddit_name,
+            display_name: `r/${sub.subreddit_name}`,
+            subscribers: sub.subscribers || 0,
+            is_nsfw: sub.is_nsfw ?? true,
+            status: sub.status
+        })); // Cast to any to avoid TS error with extra property
 }
 async function getLeadsBySubreddit(subredditId, status = "pending", limit = 50, offset = 0) {
-    // Get lead IDs that have posts in this subreddit
-    const { data: postData, error: postError } = await supabase.from("reddit_posts").select("lead_id").eq("subreddit_id", subredditId);
+    // subredditId is now from subreddit_queue, need to get subreddit_name
+    const { data: queueSub } = await supabase.from("subreddit_queue").select("subreddit_name").eq("id", subredditId).single();
+    if (!queueSub) {
+        return [];
+    }
+    const subredditName = queueSub.subreddit_name;
+    // Get lead IDs that have posts with this subreddit_name
+    const { data: postData, error: postError } = await supabase.from("reddit_posts").select("lead_id").eq("subreddit_name", subredditName);
     if (postError || !postData) {
         console.error("Error fetching posts:", postError);
         return [];
@@ -160,8 +180,18 @@ async function getLeadsBySubreddit(subredditId, status = "pending", limit = 50, 
     return data || [];
 }
 async function getSubredditStats(subredditId) {
-    // Get lead IDs that have posts in this subreddit
-    const { data: postData } = await supabase.from("reddit_posts").select("lead_id").eq("subreddit_id", subredditId);
+    // subredditId is from subreddit_queue, get subreddit_name
+    const { data: queueSub } = await supabase.from("subreddit_queue").select("subreddit_name").eq("id", subredditId).single();
+    if (!queueSub) {
+        return {
+            pending: 0,
+            approved: 0,
+            rejected: 0,
+            superliked: 0
+        };
+    }
+    // Get lead IDs that have posts with this subreddit_name
+    const { data: postData } = await supabase.from("reddit_posts").select("lead_id").eq("subreddit_name", queueSub.subreddit_name);
     const leadIds = [
         ...new Set((postData || []).map((p)=>p.lead_id))
     ];
@@ -465,13 +495,14 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
         lead.reddit_posts,
         lead.reddit_username
     ]);
-    // Get unique media for the grid
+    // Get unique media - show up to 12 images
     const mediaUrls = (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"])(()=>{
         if (!lead.reddit_posts) return [];
         const allUrls = lead.reddit_posts.flatMap((p)=>p.media_urls || []);
         const unique = [
             ...new Set(allUrls)
         ];
+        // Shuffle for variety
         for(let i = unique.length - 1; i > 0; i--){
             const j = Math.floor(Math.random() * (i + 1));
             [unique[i], unique[j]] = [
@@ -479,7 +510,33 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                 unique[i]
             ];
         }
-        return unique.slice(0, 6);
+        return unique.slice(0, 12);
+    }, [
+        lead.reddit_posts
+    ]);
+    // Preload images for faster viewing
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"])(()=>{
+        mediaUrls.forEach((url)=>{
+            const img = new Image();
+            img.src = url;
+        });
+    }, [
+        mediaUrls
+    ]);
+    // Calculate carousel pages (3 images per page)
+    const IMAGES_PER_PAGE = 3;
+    const totalPages = Math.ceil(mediaUrls.length / IMAGES_PER_PAGE);
+    const currentPageImages = mediaUrls.slice(carouselIndex * IMAGES_PER_PAGE, (carouselIndex + 1) * IMAGES_PER_PAGE);
+    // Get unique subreddits where this lead was found
+    const foundInSubreddits = (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"])(()=>{
+        if (!lead.reddit_posts) return [];
+        const subs = new Set();
+        lead.reddit_posts.forEach((post)=>{
+            if (post.subreddit_name) {
+                subs.add(post.subreddit_name);
+            }
+        });
+        return Array.from(subs).sort();
     }, [
         lead.reddit_posts
     ]);
@@ -546,6 +603,8 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
             onSuperLike();
         }
     };
+    // Track which image in lightbox
+    const [lightboxImageIndex, setLightboxImageIndex] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(0);
     // Keyboard controls
     (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"])(()=>{
         if (!isActive) return;
@@ -554,24 +613,24 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
             if (lightboxOpen) {
                 if (e.key === "Escape") {
                     setLightboxOpen(false);
-                } else if (e.key === "ArrowLeft" && carouselIndex > 0) {
-                    setCarouselIndex(carouselIndex - 1);
-                } else if (e.key === "ArrowRight" && carouselIndex < mediaUrls.length - 1) {
-                    setCarouselIndex(carouselIndex + 1);
+                } else if (e.key === "ArrowLeft" && lightboxImageIndex > 0) {
+                    setLightboxImageIndex(lightboxImageIndex - 1);
+                } else if (e.key === "ArrowRight" && lightboxImageIndex < mediaUrls.length - 1) {
+                    setLightboxImageIndex(lightboxImageIndex + 1);
                 }
                 return;
             }
-            // Card swipe controls - A/D for swipe, arrows for carousel
+            // Card swipe controls - A/D for swipe, arrows for page navigation
             if (e.key === "a") {
                 handleButtonSwipe("left");
             } else if (e.key === "d") {
                 handleButtonSwipe("right");
             } else if (e.key === "ArrowUp" || e.key === "w" || e.key === "s") {
                 handleSuperLike();
-            } else if (e.key === "ArrowLeft" && mediaUrls.length > 0) {
+            } else if (e.key === "ArrowLeft" && totalPages > 1) {
                 setCarouselIndex((prev)=>Math.max(0, prev - 1));
-            } else if (e.key === "ArrowRight" && mediaUrls.length > 0) {
-                setCarouselIndex((prev)=>Math.min(mediaUrls.length - 1, prev + 1));
+            } else if (e.key === "ArrowRight" && totalPages > 1) {
+                setCarouselIndex((prev)=>Math.min(totalPages - 1, prev + 1));
             }
         };
         window.addEventListener("keydown", handleKeyDown);
@@ -579,8 +638,10 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
     }, [
         isActive,
         lightboxOpen,
+        lightboxImageIndex,
         carouselIndex,
         mediaUrls.length,
+        totalPages,
         onSuperLike
     ]);
     const exitVariants = {
@@ -657,7 +718,7 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                             children: "NOPE"
                         }, void 0, false, {
                             fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                            lineNumber: 213,
+                            lineNumber: 245,
                             columnNumber: 11
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$framer$2d$motion$2f$dist$2f$es$2f$render$2f$components$2f$motion$2f$proxy$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["motion"].div, {
@@ -668,118 +729,153 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                             children: "YES!"
                         }, void 0, false, {
                             fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                            lineNumber: 219,
+                            lineNumber: 251,
                             columnNumber: 11
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                             onPointerDownCapture: (e)=>e.stopPropagation(),
                             children: [
                                 mediaUrls.length > 0 ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                    className: "relative bg-black/40",
+                                    className: "relative bg-black/30 p-2",
                                     children: [
-                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
-                                            onClick: ()=>setLightboxOpen(true),
-                                            className: "w-full aspect-[16/9] overflow-hidden cursor-pointer group",
+                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                            className: "grid grid-cols-3 gap-1.5",
                                             children: [
-                                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("img", {
-                                                    src: mediaUrls[carouselIndex],
-                                                    alt: `Preview ${carouselIndex + 1}`,
-                                                    className: "w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                                currentPageImages.map((url, i)=>{
+                                                    const globalIndex = carouselIndex * IMAGES_PER_PAGE + i;
+                                                    return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                                        onClick: ()=>{
+                                                            setLightboxImageIndex(globalIndex);
+                                                            setLightboxOpen(true);
+                                                        },
+                                                        className: "relative aspect-[3/4] overflow-hidden rounded-lg cursor-pointer group bg-muted",
+                                                        children: [
+                                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("img", {
+                                                                src: url,
+                                                                alt: `Preview ${globalIndex + 1}`,
+                                                                className: "w-full h-full object-cover group-hover:scale-105 transition-transform duration-200",
+                                                                loading: "eager"
+                                                            }, void 0, false, {
+                                                                fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
+                                                                lineNumber: 276,
+                                                                columnNumber: 25
+                                                            }, this),
+                                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                                className: "absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors"
+                                                            }, void 0, false, {
+                                                                fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
+                                                                lineNumber: 282,
+                                                                columnNumber: 25
+                                                            }, this)
+                                                        ]
+                                                    }, globalIndex, true, {
+                                                        fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
+                                                        lineNumber: 268,
+                                                        columnNumber: 23
+                                                    }, this);
+                                                }),
+                                                currentPageImages.length < IMAGES_PER_PAGE && Array(IMAGES_PER_PAGE - currentPageImages.length).fill(0).map((_, i)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                        className: "aspect-[3/4] rounded-lg bg-muted/20"
+                                                    }, `empty-${i}`, false, {
+                                                        fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
+                                                        lineNumber: 289,
+                                                        columnNumber: 23
+                                                    }, this))
+                                            ]
+                                        }, void 0, true, {
+                                            fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
+                                            lineNumber: 264,
+                                            columnNumber: 17
+                                        }, this),
+                                        totalPages > 1 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Fragment"], {
+                                            children: [
+                                                carouselIndex > 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                                    onClick: ()=>setCarouselIndex(carouselIndex - 1),
+                                                    className: "absolute left-0 top-1/2 -translate-y-1/2 p-1.5 rounded-r-lg bg-black/60 hover:bg-black/80 transition-colors",
+                                                    children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$chevron$2d$left$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__ChevronLeft$3e$__["ChevronLeft"], {
+                                                        size: 18,
+                                                        className: "text-white"
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
+                                                        lineNumber: 302,
+                                                        columnNumber: 25
+                                                    }, this)
                                                 }, void 0, false, {
                                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                    lineNumber: 236,
-                                                    columnNumber: 19
+                                                    lineNumber: 298,
+                                                    columnNumber: 23
                                                 }, this),
-                                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                                    className: "absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors"
+                                                carouselIndex < totalPages - 1 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                                    onClick: ()=>setCarouselIndex(carouselIndex + 1),
+                                                    className: "absolute right-0 top-1/2 -translate-y-1/2 p-1.5 rounded-l-lg bg-black/60 hover:bg-black/80 transition-colors",
+                                                    children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$chevron$2d$right$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__ChevronRight$3e$__["ChevronRight"], {
+                                                        size: 18,
+                                                        className: "text-white"
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
+                                                        lineNumber: 310,
+                                                        columnNumber: 25
+                                                    }, this)
                                                 }, void 0, false, {
                                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                    lineNumber: 241,
+                                                    lineNumber: 306,
+                                                    columnNumber: 23
+                                                }, this)
+                                            ]
+                                        }, void 0, true),
+                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                            className: "flex items-center justify-center gap-2 mt-2",
+                                            children: [
+                                                totalPages > 1 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                    className: "flex items-center gap-1",
+                                                    children: Array(totalPages).fill(0).map((_, i)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                                            onClick: ()=>setCarouselIndex(i),
+                                                            className: `w-1.5 h-1.5 rounded-full transition-all ${i === carouselIndex ? 'bg-white w-3' : 'bg-white/40 hover:bg-white/60'}`
+                                                        }, i, false, {
+                                                            fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
+                                                            lineNumber: 321,
+                                                            columnNumber: 25
+                                                        }, this))
+                                                }, void 0, false, {
+                                                    fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
+                                                    lineNumber: 319,
+                                                    columnNumber: 21
+                                                }, this),
+                                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                                    className: "text-[10px] text-white/60",
+                                                    children: [
+                                                        mediaUrls.length,
+                                                        " photos"
+                                                    ]
+                                                }, void 0, true, {
+                                                    fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
+                                                    lineNumber: 333,
                                                     columnNumber: 19
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                            lineNumber: 232,
-                                            columnNumber: 17
-                                        }, this),
-                                        carouselIndex > 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
-                                            onClick: ()=>setCarouselIndex(carouselIndex - 1),
-                                            className: "absolute left-2 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/50 hover:bg-black/70 transition-colors",
-                                            children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$chevron$2d$left$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__ChevronLeft$3e$__["ChevronLeft"], {
-                                                size: 20,
-                                                className: "text-white"
-                                            }, void 0, false, {
-                                                fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                lineNumber: 250,
-                                                columnNumber: 21
-                                            }, this)
-                                        }, void 0, false, {
-                                            fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                            lineNumber: 246,
-                                            columnNumber: 19
-                                        }, this),
-                                        carouselIndex < mediaUrls.length - 1 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
-                                            onClick: ()=>setCarouselIndex(carouselIndex + 1),
-                                            className: "absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/50 hover:bg-black/70 transition-colors",
-                                            children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$chevron$2d$right$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__ChevronRight$3e$__["ChevronRight"], {
-                                                size: 20,
-                                                className: "text-white"
-                                            }, void 0, false, {
-                                                fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                lineNumber: 258,
-                                                columnNumber: 21
-                                            }, this)
-                                        }, void 0, false, {
-                                            fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                            lineNumber: 254,
-                                            columnNumber: 19
-                                        }, this),
-                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                            className: "absolute bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-1.5",
-                                            children: mediaUrls.map((_, i)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
-                                                    onClick: ()=>setCarouselIndex(i),
-                                                    className: `w-2 h-2 rounded-full transition-all ${i === carouselIndex ? 'bg-white w-4' : 'bg-white/40 hover:bg-white/60'}`
-                                                }, i, false, {
-                                                    fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                    lineNumber: 265,
-                                                    columnNumber: 21
-                                                }, this))
-                                        }, void 0, false, {
-                                            fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                            lineNumber: 263,
-                                            columnNumber: 17
-                                        }, this),
-                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                            className: "absolute top-2 right-2 px-2 py-1 rounded-full bg-black/50 text-white text-xs font-medium",
-                                            children: [
-                                                carouselIndex + 1,
-                                                " / ",
-                                                mediaUrls.length
-                                            ]
-                                        }, void 0, true, {
-                                            fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                            lineNumber: 278,
+                                            lineNumber: 317,
                                             columnNumber: 17
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                    lineNumber: 230,
+                                    lineNumber: 262,
                                     columnNumber: 15
                                 }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                    className: "h-24 bg-gradient-to-br from-primary/20 via-accent/20 to-purple-500/20 flex items-center justify-center",
+                                    className: "h-20 bg-gradient-to-br from-primary/20 via-accent/20 to-purple-500/20 flex items-center justify-center",
                                     children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                         className: "text-muted-foreground text-sm",
                                         children: "No media available"
                                     }, void 0, false, {
                                         fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                        lineNumber: 284,
+                                        lineNumber: 340,
                                         columnNumber: 17
                                     }, this)
                                 }, void 0, false, {
                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                    lineNumber: 283,
+                                    lineNumber: 339,
                                     columnNumber: 15
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -793,7 +889,7 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                                     className: "text-emerald-400 mb-1"
                                                 }, void 0, false, {
                                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                    lineNumber: 291,
+                                                    lineNumber: 347,
                                                     columnNumber: 17
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -801,7 +897,7 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                                     children: lead.karma.toLocaleString()
                                                 }, void 0, false, {
                                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                    lineNumber: 292,
+                                                    lineNumber: 348,
                                                     columnNumber: 17
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -809,13 +905,13 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                                     children: "Karma"
                                                 }, void 0, false, {
                                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                    lineNumber: 293,
+                                                    lineNumber: 349,
                                                     columnNumber: 17
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                            lineNumber: 290,
+                                            lineNumber: 346,
                                             columnNumber: 15
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -826,7 +922,7 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                                     className: "text-sky-400 mb-1"
                                                 }, void 0, false, {
                                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                    lineNumber: 296,
+                                                    lineNumber: 352,
                                                     columnNumber: 17
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -834,7 +930,7 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                                     children: stats.postsPerDay
                                                 }, void 0, false, {
                                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                    lineNumber: 297,
+                                                    lineNumber: 353,
                                                     columnNumber: 17
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -842,13 +938,13 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                                     children: "Posts/Day"
                                                 }, void 0, false, {
                                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                    lineNumber: 298,
+                                                    lineNumber: 354,
                                                     columnNumber: 17
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                            lineNumber: 295,
+                                            lineNumber: 351,
                                             columnNumber: 15
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -859,7 +955,7 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                                     className: "text-rose-400 mb-1"
                                                 }, void 0, false, {
                                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                    lineNumber: 301,
+                                                    lineNumber: 357,
                                                     columnNumber: 17
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -867,7 +963,7 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                                     children: stats.avgUpvotes
                                                 }, void 0, false, {
                                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                    lineNumber: 302,
+                                                    lineNumber: 358,
                                                     columnNumber: 17
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -875,13 +971,13 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                                     children: "Avg Upvotes"
                                                 }, void 0, false, {
                                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                    lineNumber: 303,
+                                                    lineNumber: 359,
                                                     columnNumber: 17
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                            lineNumber: 300,
+                                            lineNumber: 356,
                                             columnNumber: 15
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -892,7 +988,7 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                                     className: "text-amber-400 mb-1"
                                                 }, void 0, false, {
                                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                    lineNumber: 306,
+                                                    lineNumber: 362,
                                                     columnNumber: 17
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -900,7 +996,7 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                                     children: stats.accountAge
                                                 }, void 0, false, {
                                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                    lineNumber: 307,
+                                                    lineNumber: 363,
                                                     columnNumber: 17
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -908,19 +1004,19 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                                     children: "Age"
                                                 }, void 0, false, {
                                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                    lineNumber: 308,
+                                                    lineNumber: 364,
                                                     columnNumber: 17
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                            lineNumber: 305,
+                                            lineNumber: 361,
                                             columnNumber: 15
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                    lineNumber: 289,
+                                    lineNumber: 345,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -934,7 +1030,7 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                                     children: "🔥"
                                                 }, void 0, false, {
                                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                    lineNumber: 321,
+                                                    lineNumber: 377,
                                                     columnNumber: 17
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -942,13 +1038,13 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                                     children: linkAnalysis.hasOF ? linkAnalysis.bioIndicatesOF ? 'OF Likely' : 'OF Found' : 'No OF'
                                                 }, void 0, false, {
                                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                    lineNumber: 322,
+                                                    lineNumber: 378,
                                                     columnNumber: 17
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                            lineNumber: 314,
+                                            lineNumber: 370,
                                             columnNumber: 15
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -959,7 +1055,7 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                                     children: linkAnalysis.hasTracking ? '🏷️' : linkAnalysis.hasOF ? '✓' : '—'
                                                 }, void 0, false, {
                                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                    lineNumber: 336,
+                                                    lineNumber: 392,
                                                     columnNumber: 17
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -967,13 +1063,13 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                                     children: linkAnalysis.hasTracking ? 'Agency?' : linkAnalysis.hasOF ? 'No Track' : '—'
                                                 }, void 0, false, {
                                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                    lineNumber: 337,
+                                                    lineNumber: 393,
                                                     columnNumber: 17
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                            lineNumber: 331,
+                                            lineNumber: 387,
                                             columnNumber: 15
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -984,7 +1080,7 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                                     children: "🌳"
                                                 }, void 0, false, {
                                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                    lineNumber: 345,
+                                                    lineNumber: 401,
                                                     columnNumber: 17
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -992,13 +1088,13 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                                     children: linkAnalysis.hasLinktree ? 'Linktree' : 'No Link'
                                                 }, void 0, false, {
                                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                    lineNumber: 346,
+                                                    lineNumber: 402,
                                                     columnNumber: 17
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                            lineNumber: 344,
+                                            lineNumber: 400,
                                             columnNumber: 15
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1009,7 +1105,7 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                                     children: "📱"
                                                 }, void 0, false, {
                                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                    lineNumber: 352,
+                                                    lineNumber: 408,
                                                     columnNumber: 17
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1017,19 +1113,19 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                                     children: linkAnalysis.hasSocials ? `${linkAnalysis.socialLinks.length} Social` : 'None'
                                                 }, void 0, false, {
                                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                    lineNumber: 353,
+                                                    lineNumber: 409,
                                                     columnNumber: 17
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                            lineNumber: 351,
+                                            lineNumber: 407,
                                             columnNumber: 15
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                    lineNumber: 313,
+                                    lineNumber: 369,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1044,14 +1140,14 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                                     className: "w-12 h-12 rounded-full object-cover border-2 border-primary/30"
                                                 }, void 0, false, {
                                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                    lineNumber: 364,
+                                                    lineNumber: 420,
                                                     columnNumber: 19
                                                 }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                                                     className: "w-12 h-12 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-xl font-bold text-white",
                                                     children: lead.reddit_username.charAt(0).toUpperCase()
                                                 }, void 0, false, {
                                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                    lineNumber: 370,
+                                                    lineNumber: 426,
                                                     columnNumber: 19
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1068,7 +1164,7 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                                                     ]
                                                                 }, void 0, true, {
                                                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                                    lineNumber: 376,
+                                                                    lineNumber: 432,
                                                                     columnNumber: 21
                                                                 }, this),
                                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("a", {
@@ -1080,18 +1176,18 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                                                         size: 14
                                                                     }, void 0, false, {
                                                                         fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                                        lineNumber: 385,
+                                                                        lineNumber: 441,
                                                                         columnNumber: 23
                                                                     }, this)
                                                                 }, void 0, false, {
                                                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                                    lineNumber: 379,
+                                                                    lineNumber: 435,
                                                                     columnNumber: 21
                                                                 }, this)
                                                             ]
                                                         }, void 0, true, {
                                                             fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                            lineNumber: 375,
+                                                            lineNumber: 431,
                                                             columnNumber: 19
                                                         }, this),
                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1102,27 +1198,70 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                                             ]
                                                         }, void 0, true, {
                                                             fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                            lineNumber: 388,
+                                                            lineNumber: 444,
                                                             columnNumber: 19
                                                         }, this)
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                    lineNumber: 374,
+                                                    lineNumber: 430,
                                                     columnNumber: 17
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                            lineNumber: 362,
+                                            lineNumber: 418,
                                             columnNumber: 15
+                                        }, this),
+                                        foundInSubreddits.length > 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                            className: "flex flex-col gap-1.5",
+                                            children: [
+                                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                    className: "text-[10px] text-muted-foreground uppercase tracking-wide font-medium",
+                                                    children: [
+                                                        "Found in ",
+                                                        foundInSubreddits.length,
+                                                        " sub",
+                                                        foundInSubreddits.length > 1 ? 's' : ''
+                                                    ]
+                                                }, void 0, true, {
+                                                    fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
+                                                    lineNumber: 453,
+                                                    columnNumber: 19
+                                                }, this),
+                                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                    className: "flex flex-wrap gap-1.5",
+                                                    children: foundInSubreddits.map((subName)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("a", {
+                                                            href: `https://reddit.com/r/${subName}`,
+                                                            target: "_blank",
+                                                            rel: "noopener noreferrer",
+                                                            className: "px-2 py-1 rounded-md bg-primary/10 text-primary text-xs font-medium hover:bg-primary/20 transition-colors border border-primary/20",
+                                                            children: [
+                                                                "r/",
+                                                                subName
+                                                            ]
+                                                        }, subName, true, {
+                                                            fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
+                                                            lineNumber: 458,
+                                                            columnNumber: 23
+                                                        }, this))
+                                                }, void 0, false, {
+                                                    fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
+                                                    lineNumber: 456,
+                                                    columnNumber: 19
+                                                }, this)
+                                            ]
+                                        }, void 0, true, {
+                                            fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
+                                            lineNumber: 452,
+                                            columnNumber: 17
                                         }, this),
                                         lead.bio && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
                                             className: "text-sm text-muted-foreground bg-secondary/30 rounded-lg p-3",
                                             children: lead.bio
                                         }, void 0, false, {
                                             fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                            lineNumber: 396,
+                                            lineNumber: 474,
                                             columnNumber: 17
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1140,13 +1279,13 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                                             size: 14
                                                         }, void 0, false, {
                                                             fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                            lineNumber: 416,
+                                                            lineNumber: 494,
                                                             columnNumber: 21
                                                         }, this)
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                    lineNumber: 405,
+                                                    lineNumber: 483,
                                                     columnNumber: 19
                                                 }, this) : // No OF link found - show button to check their bio/profile for links
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("a", {
@@ -1160,13 +1299,13 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                                             size: 14
                                                         }, void 0, false, {
                                                             fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                            lineNumber: 427,
+                                                            lineNumber: 505,
                                                             columnNumber: 21
                                                         }, this)
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                    lineNumber: 420,
+                                                    lineNumber: 498,
                                                     columnNumber: 19
                                                 }, this),
                                                 linkAnalysis.linktreeLinks.length > 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("a", {
@@ -1180,13 +1319,13 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                                             size: 12
                                                         }, void 0, false, {
                                                             fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                            lineNumber: 440,
+                                                            lineNumber: 518,
                                                             columnNumber: 21
                                                         }, this)
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                    lineNumber: 433,
+                                                    lineNumber: 511,
                                                     columnNumber: 19
                                                 }, this),
                                                 linkAnalysis.ofLinks.length > 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("a", {
@@ -1200,31 +1339,31 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                                             size: 12
                                                         }, void 0, false, {
                                                             fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                            lineNumber: 453,
+                                                            lineNumber: 531,
                                                             columnNumber: 21
                                                         }, this)
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                    lineNumber: 446,
+                                                    lineNumber: 524,
                                                     columnNumber: 19
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                            lineNumber: 402,
+                                            lineNumber: 480,
                                             columnNumber: 15
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                    lineNumber: 360,
+                                    lineNumber: 416,
                                     columnNumber: 13
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                            lineNumber: 227,
+                            lineNumber: 259,
                             columnNumber: 11
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1240,12 +1379,12 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                         strokeWidth: 3
                                     }, void 0, false, {
                                         fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                        lineNumber: 470,
+                                        lineNumber: 548,
                                         columnNumber: 15
                                     }, this)
                                 }, void 0, false, {
                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                    lineNumber: 465,
+                                    lineNumber: 543,
                                     columnNumber: 13
                                 }, this),
                                 onSuperLike && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -1258,12 +1397,12 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                         fill: "currentColor"
                                     }, void 0, false, {
                                         fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                        lineNumber: 480,
+                                        lineNumber: 558,
                                         columnNumber: 17
                                     }, this)
                                 }, void 0, false, {
                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                    lineNumber: 475,
+                                    lineNumber: 553,
                                     columnNumber: 15
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -1276,29 +1415,29 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                         fill: "currentColor"
                                     }, void 0, false, {
                                         fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                        lineNumber: 489,
+                                        lineNumber: 567,
                                         columnNumber: 15
                                     }, this)
                                 }, void 0, false, {
                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                    lineNumber: 484,
+                                    lineNumber: 562,
                                     columnNumber: 13
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                            lineNumber: 461,
+                            lineNumber: 539,
                             columnNumber: 11
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                    lineNumber: 203,
+                    lineNumber: 235,
                     columnNumber: 9
                 }, this)
             }, void 0, false, {
                 fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                lineNumber: 196,
+                lineNumber: 228,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$framer$2d$motion$2f$dist$2f$es$2f$components$2f$AnimatePresence$2f$index$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["AnimatePresence"], {
@@ -1326,30 +1465,30 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                 className: "text-white"
                             }, void 0, false, {
                                 fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                lineNumber: 513,
+                                lineNumber: 591,
                                 columnNumber: 15
                             }, this)
                         }, void 0, false, {
                             fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                            lineNumber: 506,
+                            lineNumber: 584,
                             columnNumber: 13
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                             className: "absolute top-4 left-4 text-white/80 text-sm font-medium bg-black/40 px-3 py-1 rounded-full",
                             children: [
-                                carouselIndex + 1,
+                                lightboxImageIndex + 1,
                                 " / ",
                                 mediaUrls.length
                             ]
                         }, void 0, true, {
                             fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                            lineNumber: 517,
+                            lineNumber: 595,
                             columnNumber: 13
                         }, this),
-                        carouselIndex > 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                        lightboxImageIndex > 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
                             onClick: (e)=>{
                                 e.stopPropagation();
-                                setCarouselIndex(carouselIndex - 1);
+                                setLightboxImageIndex(lightboxImageIndex - 1);
                             },
                             className: "absolute left-4 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white/20 hover:bg-white/30 transition-colors",
                             children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$chevron$2d$left$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__ChevronLeft$3e$__["ChevronLeft"], {
@@ -1357,18 +1496,18 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                 className: "text-white"
                             }, void 0, false, {
                                 fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                lineNumber: 530,
+                                lineNumber: 608,
                                 columnNumber: 17
                             }, this)
                         }, void 0, false, {
                             fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                            lineNumber: 523,
+                            lineNumber: 601,
                             columnNumber: 15
                         }, this),
-                        carouselIndex < mediaUrls.length - 1 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                        lightboxImageIndex < mediaUrls.length - 1 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
                             onClick: (e)=>{
                                 e.stopPropagation();
-                                setCarouselIndex(carouselIndex + 1);
+                                setLightboxImageIndex(lightboxImageIndex + 1);
                             },
                             className: "absolute right-4 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white/20 hover:bg-white/30 transition-colors",
                             children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$chevron$2d$right$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__ChevronRight$3e$__["ChevronRight"], {
@@ -1376,12 +1515,12 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                 className: "text-white"
                             }, void 0, false, {
                                 fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                lineNumber: 541,
+                                lineNumber: 619,
                                 columnNumber: 17
                             }, this)
                         }, void 0, false, {
                             fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                            lineNumber: 534,
+                            lineNumber: 612,
                             columnNumber: 15
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$framer$2d$motion$2f$dist$2f$es$2f$render$2f$components$2f$motion$2f$proxy$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["motion"].img, {
@@ -1397,13 +1536,13 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                 scale: 0.9,
                                 opacity: 0
                             },
-                            src: mediaUrls[carouselIndex],
-                            alt: `Full preview ${carouselIndex + 1}`,
+                            src: mediaUrls[lightboxImageIndex],
+                            alt: `Full preview ${lightboxImageIndex + 1}`,
                             className: "max-h-[90vh] max-w-[90vw] object-contain rounded-lg",
                             onClick: (e)=>e.stopPropagation()
-                        }, carouselIndex, false, {
+                        }, lightboxImageIndex, false, {
                             fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                            lineNumber: 546,
+                            lineNumber: 624,
                             columnNumber: 13
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1413,31 +1552,31 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                     children: "← → Navigate"
                                 }, void 0, false, {
                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                    lineNumber: 559,
+                                    lineNumber: 637,
                                     columnNumber: 15
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                     children: "ESC Close"
                                 }, void 0, false, {
                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                    lineNumber: 560,
+                                    lineNumber: 638,
                                     columnNumber: 15
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                            lineNumber: 558,
+                            lineNumber: 636,
                             columnNumber: 13
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                    lineNumber: 498,
+                    lineNumber: 576,
                     columnNumber: 11
                 }, this)
             }, void 0, false, {
                 fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                lineNumber: 496,
+                lineNumber: 574,
                 columnNumber: 7
             }, this)
         ]
@@ -2069,8 +2208,9 @@ __turbopack_context__.s([
 var __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/Desktop/redditscraper/frontend/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react-jsx-dev-runtime.js [app-ssr] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/Desktop/redditscraper/frontend/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$chevron$2d$down$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__ChevronDown$3e$__ = __turbopack_context__.i("[project]/Desktop/redditscraper/frontend/node_modules/lucide-react/dist/esm/icons/chevron-down.js [app-ssr] (ecmascript) <export default as ChevronDown>");
-var __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$x$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__X$3e$__ = __turbopack_context__.i("[project]/Desktop/redditscraper/frontend/node_modules/lucide-react/dist/esm/icons/x.js [app-ssr] (ecmascript) <export default as X>");
-var __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$layers$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__Layers$3e$__ = __turbopack_context__.i("[project]/Desktop/redditscraper/frontend/node_modules/lucide-react/dist/esm/icons/layers.js [app-ssr] (ecmascript) <export default as Layers>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$check$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__Check$3e$__ = __turbopack_context__.i("[project]/Desktop/redditscraper/frontend/node_modules/lucide-react/dist/esm/icons/check.js [app-ssr] (ecmascript) <export default as Check>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$filter$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__Filter$3e$__ = __turbopack_context__.i("[project]/Desktop/redditscraper/frontend/node_modules/lucide-react/dist/esm/icons/filter.js [app-ssr] (ecmascript) <export default as Filter>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$rotate$2d$ccw$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__RotateCcw$3e$__ = __turbopack_context__.i("[project]/Desktop/redditscraper/frontend/node_modules/lucide-react/dist/esm/icons/rotate-ccw.js [app-ssr] (ecmascript) <export default as RotateCcw>");
 var __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$framer$2d$motion$2f$dist$2f$es$2f$render$2f$components$2f$motion$2f$proxy$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/Desktop/redditscraper/frontend/node_modules/framer-motion/dist/es/render/components/motion/proxy.mjs [app-ssr] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$framer$2d$motion$2f$dist$2f$es$2f$components$2f$AnimatePresence$2f$index$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/Desktop/redditscraper/frontend/node_modules/framer-motion/dist/es/components/AnimatePresence/index.mjs [app-ssr] (ecmascript)");
 "use client";
@@ -2078,7 +2218,7 @@ var __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$
 ;
 ;
 ;
-function SubredditSelector({ subreddits, selectedSubreddit, onSelect, pendingCounts = {} }) {
+function SubredditSelector({ subreddits, excludedSubreddits, onExclusionChange, pendingCounts = {} }) {
     const [isOpen, setIsOpen] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(false);
     const [search, setSearch] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])("");
     const dropdownRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"])(null);
@@ -2102,27 +2242,44 @@ function SubredditSelector({ subreddits, selectedSubreddit, onSelect, pendingCou
         const countB = pendingCounts[b.id] || 0;
         return countB - countA;
     });
+    const toggleSubreddit = (subId)=>{
+        const newExcluded = new Set(excludedSubreddits);
+        if (newExcluded.has(subId)) {
+            newExcluded.delete(subId);
+        } else {
+            newExcluded.add(subId);
+        }
+        onExclusionChange(newExcluded);
+    };
+    const selectAll = ()=>{
+        onExclusionChange(new Set());
+    };
+    const deselectAll = ()=>{
+        onExclusionChange(new Set(subreddits.map((s)=>s.id)));
+    };
+    const activeCount = subreddits.length - excludedSubreddits.size;
+    const totalPending = Object.entries(pendingCounts).filter(([id])=>!excludedSubreddits.has(id)).reduce((sum, [, count])=>sum + count, 0);
     return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
         className: "relative",
         ref: dropdownRef,
         children: [
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
                 onClick: ()=>setIsOpen(!isOpen),
-                className: `flex items-center gap-2 px-4 py-2.5 rounded-xl border transition-all ${selectedSubreddit ? "bg-primary/10 border-primary/30 text-primary" : "bg-secondary border-border hover:border-primary/30"}`,
+                className: `flex items-center gap-2 px-4 py-2.5 rounded-xl border transition-all ${excludedSubreddits.size > 0 ? "bg-amber-500/10 border-amber-500/30 text-amber-400" : "bg-secondary border-border hover:border-primary/30"}`,
                 children: [
-                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$layers$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__Layers$3e$__["Layers"], {
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$filter$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__Filter$3e$__["Filter"], {
                         size: 16
                     }, void 0, false, {
                         fileName: "[project]/Desktop/redditscraper/frontend/src/components/SubredditSelector.tsx",
-                        lineNumber: 59,
+                        lineNumber: 82,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                         className: "font-medium",
-                        children: selectedSubreddit ? `r/${selectedSubreddit.name}` : "All Subreddits"
+                        children: excludedSubreddits.size > 0 ? `${activeCount}/${subreddits.length} subs` : "All Subreddits"
                     }, void 0, false, {
                         fileName: "[project]/Desktop/redditscraper/frontend/src/components/SubredditSelector.tsx",
-                        lineNumber: 60,
+                        lineNumber: 83,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$chevron$2d$down$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__ChevronDown$3e$__["ChevronDown"], {
@@ -2130,32 +2287,14 @@ function SubredditSelector({ subreddits, selectedSubreddit, onSelect, pendingCou
                         className: `transition-transform ${isOpen ? "rotate-180" : ""}`
                     }, void 0, false, {
                         fileName: "[project]/Desktop/redditscraper/frontend/src/components/SubredditSelector.tsx",
-                        lineNumber: 63,
+                        lineNumber: 88,
                         columnNumber: 9
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/Desktop/redditscraper/frontend/src/components/SubredditSelector.tsx",
-                lineNumber: 51,
+                lineNumber: 74,
                 columnNumber: 7
-            }, this),
-            selectedSubreddit && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
-                onClick: (e)=>{
-                    e.stopPropagation();
-                    onSelect(null);
-                },
-                className: "absolute -right-2 -top-2 p-1 rounded-full bg-destructive text-white hover:bg-destructive/80 transition-colors",
-                children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$x$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__X$3e$__["X"], {
-                    size: 12
-                }, void 0, false, {
-                    fileName: "[project]/Desktop/redditscraper/frontend/src/components/SubredditSelector.tsx",
-                    lineNumber: 78,
-                    columnNumber: 11
-                }, this)
-            }, void 0, false, {
-                fileName: "[project]/Desktop/redditscraper/frontend/src/components/SubredditSelector.tsx",
-                lineNumber: 71,
-                columnNumber: 9
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$framer$2d$motion$2f$dist$2f$es$2f$components$2f$AnimatePresence$2f$index$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["AnimatePresence"], {
                 children: isOpen && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$framer$2d$motion$2f$dist$2f$es$2f$render$2f$components$2f$motion$2f$proxy$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["motion"].div, {
@@ -2171,122 +2310,199 @@ function SubredditSelector({ subreddits, selectedSubreddit, onSelect, pendingCou
                         opacity: 0,
                         y: -10
                     },
-                    className: "absolute top-full left-0 mt-2 w-72 bg-card border border-border rounded-xl shadow-xl z-50 overflow-hidden",
+                    className: "absolute top-full left-0 mt-2 w-80 bg-card border border-border rounded-xl shadow-xl z-50 overflow-hidden",
                     children: [
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                            className: "p-3 border-b border-border",
-                            children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
-                                type: "text",
-                                placeholder: "Search subreddits...",
-                                value: search,
-                                onChange: (e)=>setSearch(e.target.value),
-                                className: "w-full px-3 py-2 bg-secondary rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50",
-                                autoFocus: true
-                            }, void 0, false, {
-                                fileName: "[project]/Desktop/redditscraper/frontend/src/components/SubredditSelector.tsx",
-                                lineNumber: 93,
-                                columnNumber: 15
-                            }, this)
-                        }, void 0, false, {
-                            fileName: "[project]/Desktop/redditscraper/frontend/src/components/SubredditSelector.tsx",
-                            lineNumber: 92,
-                            columnNumber: 13
-                        }, this),
-                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                            className: "max-h-64 overflow-y-auto",
+                            className: "p-3 border-b border-border bg-secondary/30",
                             children: [
-                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
-                                    onClick: ()=>{
-                                        onSelect(null);
-                                        setIsOpen(false);
-                                        setSearch("");
-                                    },
-                                    className: `w-full px-4 py-3 text-left hover:bg-secondary/50 transition-colors flex items-center justify-between ${!selectedSubreddit ? "bg-primary/10" : ""}`,
+                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                    className: "flex items-center justify-between mb-2",
                                     children: [
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                            className: "font-medium",
-                                            children: "All Subreddits"
+                                            className: "text-sm font-medium",
+                                            children: "Filter Subreddits"
                                         }, void 0, false, {
                                             fileName: "[project]/Desktop/redditscraper/frontend/src/components/SubredditSelector.tsx",
-                                            lineNumber: 116,
+                                            lineNumber: 106,
                                             columnNumber: 17
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                             className: "text-xs text-muted-foreground",
                                             children: [
-                                                Object.values(pendingCounts).reduce((a, b)=>a + b, 0),
-                                                " pending"
+                                                totalPending,
+                                                " pending in ",
+                                                activeCount,
+                                                " subs"
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/Desktop/redditscraper/frontend/src/components/SubredditSelector.tsx",
-                                            lineNumber: 117,
+                                            lineNumber: 107,
                                             columnNumber: 17
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SubredditSelector.tsx",
-                                    lineNumber: 106,
+                                    lineNumber: 105,
                                     columnNumber: 15
                                 }, this),
-                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                    className: "border-t border-border"
+                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
+                                    type: "text",
+                                    placeholder: "Search subreddits...",
+                                    value: search,
+                                    onChange: (e)=>setSearch(e.target.value),
+                                    className: "w-full px-3 py-2 bg-secondary rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50",
+                                    autoFocus: true
                                 }, void 0, false, {
                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SubredditSelector.tsx",
-                                    lineNumber: 123,
+                                    lineNumber: 112,
+                                    columnNumber: 15
+                                }, this)
+                            ]
+                        }, void 0, true, {
+                            fileName: "[project]/Desktop/redditscraper/frontend/src/components/SubredditSelector.tsx",
+                            lineNumber: 104,
+                            columnNumber: 13
+                        }, this),
+                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                            className: "flex items-center gap-2 p-2 border-b border-border",
+                            children: [
+                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                    onClick: selectAll,
+                                    className: "flex-1 px-3 py-1.5 text-xs font-medium rounded-lg bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 transition-colors",
+                                    children: "Select All"
+                                }, void 0, false, {
+                                    fileName: "[project]/Desktop/redditscraper/frontend/src/components/SubredditSelector.tsx",
+                                    lineNumber: 124,
                                     columnNumber: 15
                                 }, this),
+                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                    onClick: deselectAll,
+                                    className: "flex-1 px-3 py-1.5 text-xs font-medium rounded-lg bg-destructive/20 text-destructive hover:bg-destructive/30 transition-colors",
+                                    children: "Deselect All"
+                                }, void 0, false, {
+                                    fileName: "[project]/Desktop/redditscraper/frontend/src/components/SubredditSelector.tsx",
+                                    lineNumber: 130,
+                                    columnNumber: 15
+                                }, this),
+                                excludedSubreddits.size > 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                    onClick: selectAll,
+                                    className: "p-1.5 rounded-lg bg-secondary hover:bg-secondary/80 transition-colors",
+                                    title: "Reset filters",
+                                    children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$rotate$2d$ccw$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__RotateCcw$3e$__["RotateCcw"], {
+                                        size: 14
+                                    }, void 0, false, {
+                                        fileName: "[project]/Desktop/redditscraper/frontend/src/components/SubredditSelector.tsx",
+                                        lineNumber: 142,
+                                        columnNumber: 19
+                                    }, this)
+                                }, void 0, false, {
+                                    fileName: "[project]/Desktop/redditscraper/frontend/src/components/SubredditSelector.tsx",
+                                    lineNumber: 137,
+                                    columnNumber: 17
+                                }, this)
+                            ]
+                        }, void 0, true, {
+                            fileName: "[project]/Desktop/redditscraper/frontend/src/components/SubredditSelector.tsx",
+                            lineNumber: 123,
+                            columnNumber: 13
+                        }, this),
+                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                            className: "max-h-72 overflow-y-auto",
+                            children: [
                                 sortedSubreddits.map((sub)=>{
                                     const count = pendingCounts[sub.id] || 0;
+                                    const isExcluded = excludedSubreddits.has(sub.id);
+                                    // Check if sub is being actively crawled (from getSubreddits query that includes processing subs)
+                                    const isActive = sub.status === "processing";
                                     return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
-                                        onClick: ()=>{
-                                            onSelect(sub);
-                                            setIsOpen(false);
-                                            setSearch("");
-                                        },
-                                        className: `w-full px-4 py-3 text-left hover:bg-secondary/50 transition-colors flex items-center justify-between ${selectedSubreddit?.id === sub.id ? "bg-primary/10" : ""}`,
+                                        onClick: ()=>toggleSubreddit(sub.id),
+                                        className: `w-full px-3 py-2.5 text-left hover:bg-secondary/50 transition-colors flex items-center gap-3 ${isExcluded ? "opacity-50" : ""} ${isActive ? "bg-blue-500/10" : ""}`,
                                         children: [
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                className: `w-5 h-5 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 ${isExcluded ? "border-muted-foreground/40 bg-transparent" : "border-emerald-500 bg-emerald-500"}`,
+                                                children: !isExcluded && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$check$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__Check$3e$__["Check"], {
+                                                    size: 12,
+                                                    className: "text-white",
+                                                    strokeWidth: 3
+                                                }, void 0, false, {
+                                                    fileName: "[project]/Desktop/redditscraper/frontend/src/components/SubredditSelector.tsx",
+                                                    lineNumber: 169,
+                                                    columnNumber: 39
+                                                }, this)
+                                            }, void 0, false, {
+                                                fileName: "[project]/Desktop/redditscraper/frontend/src/components/SubredditSelector.tsx",
+                                                lineNumber: 164,
+                                                columnNumber: 21
+                                            }, this),
+                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                className: "flex-1 min-w-0",
                                                 children: [
-                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                                        className: "font-medium",
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                        className: "flex items-center gap-2",
                                                         children: [
-                                                            "r/",
-                                                            sub.name
+                                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                                                className: `font-medium truncate ${isExcluded ? "line-through" : ""}`,
+                                                                children: [
+                                                                    "r/",
+                                                                    sub.name
+                                                                ]
+                                                            }, void 0, true, {
+                                                                fileName: "[project]/Desktop/redditscraper/frontend/src/components/SubredditSelector.tsx",
+                                                                lineNumber: 175,
+                                                                columnNumber: 25
+                                                            }, this),
+                                                            isActive && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                                                className: "flex items-center gap-1 px-1.5 py-0.5 bg-blue-500/20 text-blue-400 rounded text-[9px] font-medium",
+                                                                children: [
+                                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                                                        className: "w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse"
+                                                                    }, void 0, false, {
+                                                                        fileName: "[project]/Desktop/redditscraper/frontend/src/components/SubredditSelector.tsx",
+                                                                        lineNumber: 180,
+                                                                        columnNumber: 29
+                                                                    }, this),
+                                                                    "ACTIVE"
+                                                                ]
+                                                            }, void 0, true, {
+                                                                fileName: "[project]/Desktop/redditscraper/frontend/src/components/SubredditSelector.tsx",
+                                                                lineNumber: 179,
+                                                                columnNumber: 27
+                                                            }, this)
                                                         ]
                                                     }, void 0, true, {
                                                         fileName: "[project]/Desktop/redditscraper/frontend/src/components/SubredditSelector.tsx",
-                                                        lineNumber: 141,
+                                                        lineNumber: 174,
                                                         columnNumber: 23
                                                     }, this),
                                                     sub.subscribers > 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                                        className: "text-xs text-muted-foreground ml-2",
+                                                        className: "text-[10px] text-muted-foreground",
                                                         children: [
                                                             sub.subscribers.toLocaleString(),
                                                             " members"
                                                         ]
                                                     }, void 0, true, {
                                                         fileName: "[project]/Desktop/redditscraper/frontend/src/components/SubredditSelector.tsx",
-                                                        lineNumber: 143,
+                                                        lineNumber: 186,
                                                         columnNumber: 25
                                                     }, this)
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/Desktop/redditscraper/frontend/src/components/SubredditSelector.tsx",
-                                                lineNumber: 140,
+                                                lineNumber: 173,
                                                 columnNumber: 21
                                             }, this),
                                             count > 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                                className: "px-2 py-0.5 bg-amber-500/20 text-amber-400 rounded-full text-xs font-medium",
+                                                className: `px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0 ${isExcluded ? "bg-muted/30 text-muted-foreground" : "bg-amber-500/20 text-amber-400"}`,
                                                 children: count
                                             }, void 0, false, {
                                                 fileName: "[project]/Desktop/redditscraper/frontend/src/components/SubredditSelector.tsx",
-                                                lineNumber: 149,
+                                                lineNumber: 194,
                                                 columnNumber: 23
                                             }, this)
                                         ]
                                     }, sub.id, true, {
                                         fileName: "[project]/Desktop/redditscraper/frontend/src/components/SubredditSelector.tsx",
-                                        lineNumber: 129,
+                                        lineNumber: 156,
                                         columnNumber: 19
                                     }, this);
                                 }),
@@ -2295,30 +2511,45 @@ function SubredditSelector({ subreddits, selectedSubreddit, onSelect, pendingCou
                                     children: "No subreddits found"
                                 }, void 0, false, {
                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SubredditSelector.tsx",
-                                    lineNumber: 158,
+                                    lineNumber: 207,
                                     columnNumber: 17
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/Desktop/redditscraper/frontend/src/components/SubredditSelector.tsx",
-                            lineNumber: 104,
+                            lineNumber: 148,
+                            columnNumber: 13
+                        }, this),
+                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                            className: "p-2 border-t border-border bg-secondary/20 text-center",
+                            children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                className: "text-[10px] text-muted-foreground",
+                                children: "Uncheck subs to hide their leads"
+                            }, void 0, false, {
+                                fileName: "[project]/Desktop/redditscraper/frontend/src/components/SubredditSelector.tsx",
+                                lineNumber: 215,
+                                columnNumber: 15
+                            }, this)
+                        }, void 0, false, {
+                            fileName: "[project]/Desktop/redditscraper/frontend/src/components/SubredditSelector.tsx",
+                            lineNumber: 214,
                             columnNumber: 13
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SubredditSelector.tsx",
-                    lineNumber: 85,
+                    lineNumber: 97,
                     columnNumber: 11
                 }, this)
             }, void 0, false, {
                 fileName: "[project]/Desktop/redditscraper/frontend/src/components/SubredditSelector.tsx",
-                lineNumber: 83,
+                lineNumber: 95,
                 columnNumber: 7
             }, this)
         ]
     }, void 0, true, {
         fileName: "[project]/Desktop/redditscraper/frontend/src/components/SubredditSelector.tsx",
-        lineNumber: 49,
+        lineNumber: 72,
         columnNumber: 5
     }, this);
 }
@@ -3033,20 +3264,20 @@ function Home() {
     const [currentFilter, setCurrentFilter] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])("pending");
     const [isLoading, setIsLoading] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(true);
     const [isRefreshing, setIsRefreshing] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(false);
-    // Subreddit filtering
+    // Subreddit filtering - multi-select exclusion
     const [subreddits, setSubreddits] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])([]);
-    const [selectedSubreddit, setSelectedSubreddit] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(null);
+    const [excludedSubreddits, setExcludedSubreddits] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(new Set());
     const [subredditPendingCounts, setSubredditPendingCounts] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])({});
     // Fetch subreddits
     const fetchSubreddits = (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])(async ()=>{
         try {
             const data = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$src$2f$lib$2f$supabase$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getSubreddits"])();
             setSubreddits(data);
-            // Calculate pending counts per subreddit
+            // Calculate pending counts per subreddit (using subreddit_name now)
             const { supabase } = await __turbopack_context__.A("[project]/Desktop/redditscraper/frontend/src/lib/supabase.ts [app-ssr] (ecmascript, async loader)");
             const counts = {};
             for (const sub of data){
-                const { data: posts } = await supabase.from("reddit_posts").select("lead_id").eq("subreddit_id", sub.id);
+                const { data: posts } = await supabase.from("reddit_posts").select("lead_id").eq("subreddit_name", sub.name); // Use name instead of id
                 if (posts) {
                     const leadIds = [
                         ...new Set(posts.map((p)=>p.lead_id))
@@ -3062,23 +3293,41 @@ function Home() {
             console.error("Error fetching subreddits:", error);
         }
     }, []);
-    // Fetch leads based on current filter and selected subreddit
+    // Fetch leads based on current filter and excluded subreddits
     const fetchLeads = (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])(async ()=>{
         setIsLoading(true);
         try {
             let data;
-            if (selectedSubreddit) {
-                // Filter by subreddit
-                data = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$src$2f$lib$2f$supabase$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getLeadsBySubreddit"])(selectedSubreddit.id, currentFilter, 50);
-            } else if (currentFilter === "pending") {
-                data = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$src$2f$lib$2f$supabase$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getPendingLeads"])(50);
+            if (currentFilter === "pending") {
+                data = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$src$2f$lib$2f$supabase$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getPendingLeads"])(100); // Fetch more to filter
             } else if (currentFilter === "contacted") {
-                // Special filter for contacted leads (across all statuses)
-                data = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$src$2f$lib$2f$supabase$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getContactedLeads"])(50);
+                data = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$src$2f$lib$2f$supabase$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getContactedLeads"])(100);
             } else {
-                data = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$src$2f$lib$2f$supabase$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getLeadsByStatus"])(currentFilter, 50);
+                data = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$src$2f$lib$2f$supabase$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getLeadsByStatus"])(currentFilter, 100);
             }
-            setLeads(data);
+            // Filter out leads from excluded subreddits
+            if (excludedSubreddits.size > 0 && data.length > 0) {
+                // Get subreddit IDs for each lead's posts
+                const { supabase } = await __turbopack_context__.A("[project]/Desktop/redditscraper/frontend/src/lib/supabase.ts [app-ssr] (ecmascript, async loader)");
+                // For each lead, check if ALL their posts are from excluded subreddits
+                const filteredData = [];
+                for (const lead of data){
+                    // Get subreddit IDs from this lead's posts
+                    const leadSubredditIds = new Set((lead.reddit_posts || []).map((p)=>p.subreddit_id).filter(Boolean));
+                    // If lead has no posts with subreddit info, include them
+                    if (leadSubredditIds.size === 0) {
+                        filteredData.push(lead);
+                        continue;
+                    }
+                    // Check if at least one post is from a non-excluded subreddit
+                    const hasNonExcludedPost = Array.from(leadSubredditIds).some((subId)=>!excludedSubreddits.has(subId));
+                    if (hasNonExcludedPost) {
+                        filteredData.push(lead);
+                    }
+                }
+                data = filteredData;
+            }
+            setLeads(data.slice(0, 50)); // Limit final results
             setCurrentIndex(0);
         } catch (error) {
             console.error("Error fetching leads:", error);
@@ -3087,7 +3336,7 @@ function Home() {
         }
     }, [
         currentFilter,
-        selectedSubreddit
+        excludedSubreddits
     ]);
     // Fetch stats
     const fetchStats = (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])(async ()=>{
@@ -3123,12 +3372,12 @@ function Home() {
         currentFilter,
         swipeHistory.length
     ]);
-    // Refetch when filter or subreddit changes
+    // Refetch when filter or exclusions change
     (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"])(()=>{
         fetchLeads();
     }, [
         currentFilter,
-        selectedSubreddit,
+        excludedSubreddits,
         fetchLeads
     ]);
     // Handle swipe
@@ -3252,14 +3501,14 @@ function Home() {
                                         className: "text-primary"
                                     }, void 0, false, {
                                         fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                                        lineNumber: 280,
+                                        lineNumber: 311,
                                         columnNumber: 13
                                     }, this),
                                     "Lead Swiper"
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                                lineNumber: 279,
+                                lineNumber: 310,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -3267,13 +3516,13 @@ function Home() {
                                 children: "Swipe through Reddit leads for your OF agency"
                             }, void 0, false, {
                                 fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                                lineNumber: 283,
+                                lineNumber: 314,
                                 columnNumber: 11
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                        lineNumber: 278,
+                        lineNumber: 309,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -3286,18 +3535,18 @@ function Home() {
                             className: isRefreshing ? "animate-spin" : ""
                         }, void 0, false, {
                             fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                            lineNumber: 293,
+                            lineNumber: 324,
                             columnNumber: 11
                         }, this)
                     }, void 0, false, {
                         fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                        lineNumber: 287,
+                        lineNumber: 318,
                         columnNumber: 9
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                lineNumber: 277,
+                lineNumber: 308,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3308,45 +3557,47 @@ function Home() {
                         children: [
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$src$2f$components$2f$SubredditSelector$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["SubredditSelector"], {
                                 subreddits: subreddits,
-                                selectedSubreddit: selectedSubreddit,
-                                onSelect: (sub)=>{
-                                    setSelectedSubreddit(sub);
-                                    setSwipeHistory([]); // Clear undo history when switching
+                                excludedSubreddits: excludedSubreddits,
+                                onExclusionChange: (excluded)=>{
+                                    setExcludedSubreddits(excluded);
+                                    setSwipeHistory([]); // Clear undo history when filter changes
                                 },
                                 pendingCounts: subredditPendingCounts
                             }, void 0, false, {
                                 fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                                lineNumber: 303,
+                                lineNumber: 334,
                                 columnNumber: 11
                             }, this),
-                            selectedSubreddit && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                            excludedSubreddits.size > 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                 className: "text-sm text-muted-foreground",
                                 children: [
-                                    "Filtering leads from r/",
-                                    selectedSubreddit.name
+                                    "Hiding ",
+                                    excludedSubreddits.size,
+                                    " subreddit",
+                                    excludedSubreddits.size > 1 ? "s" : ""
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                                lineNumber: 313,
+                                lineNumber: 344,
                                 columnNumber: 13
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                        lineNumber: 302,
+                        lineNumber: 333,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$src$2f$components$2f$KeywordManager$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["KeywordManager"], {
                         onJobQueued: ()=>fetchSubreddits()
                     }, void 0, false, {
                         fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                        lineNumber: 320,
+                        lineNumber: 351,
                         columnNumber: 9
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                lineNumber: 301,
+                lineNumber: 332,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$src$2f$components$2f$StatsBar$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["StatsBar"], {
@@ -3355,7 +3606,7 @@ function Home() {
                 onFilterChange: setCurrentFilter
             }, void 0, false, {
                 fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                lineNumber: 324,
+                lineNumber: 355,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3369,7 +3620,7 @@ function Home() {
                                 className: "w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto"
                             }, void 0, false, {
                                 fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                                lineNumber: 335,
+                                lineNumber: 366,
                                 columnNumber: 15
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -3377,18 +3628,18 @@ function Home() {
                                 children: "Loading leads..."
                             }, void 0, false, {
                                 fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                                lineNumber: 336,
+                                lineNumber: 367,
                                 columnNumber: 15
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                        lineNumber: 334,
+                        lineNumber: 365,
                         columnNumber: 13
                     }, this)
                 }, void 0, false, {
                     fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                    lineNumber: 333,
+                    lineNumber: 364,
                     columnNumber: 11
                 }, this) : showSwiper ? // Swipe mode for pending leads
                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Fragment"], {
@@ -3404,7 +3655,7 @@ function Home() {
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                                lineNumber: 345,
+                                lineNumber: 376,
                                 columnNumber: 17
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3418,17 +3669,17 @@ function Home() {
                                         isActive: true
                                     }, currentLead.id, false, {
                                         fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                                        lineNumber: 353,
+                                        lineNumber: 384,
                                         columnNumber: 23
                                     }, this)
                                 }, void 0, false, {
                                     fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                                    lineNumber: 351,
+                                    lineNumber: 382,
                                     columnNumber: 19
                                 }, this)
                             }, void 0, false, {
                                 fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                                lineNumber: 350,
+                                lineNumber: 381,
                                 columnNumber: 17
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3444,7 +3695,7 @@ function Home() {
                                                 size: 16
                                             }, void 0, false, {
                                                 fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                                                lineNumber: 373,
+                                                lineNumber: 404,
                                                 columnNumber: 21
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -3452,7 +3703,7 @@ function Home() {
                                                 children: "Undo"
                                             }, void 0, false, {
                                                 fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                                                lineNumber: 374,
+                                                lineNumber: 405,
                                                 columnNumber: 21
                                             }, this),
                                             swipeHistory.length > 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -3464,13 +3715,13 @@ function Home() {
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                                                lineNumber: 376,
+                                                lineNumber: 407,
                                                 columnNumber: 23
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                                        lineNumber: 367,
+                                        lineNumber: 398,
                                         columnNumber: 19
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3484,14 +3735,14 @@ function Home() {
                                                         children: "←"
                                                     }, void 0, false, {
                                                         fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                                                        lineNumber: 385,
+                                                        lineNumber: 416,
                                                         columnNumber: 23
                                                     }, this),
                                                     "Reject"
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                                                lineNumber: 384,
+                                                lineNumber: 415,
                                                 columnNumber: 21
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -3502,7 +3753,7 @@ function Home() {
                                                         children: "↑"
                                                     }, void 0, false, {
                                                         fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                                                        lineNumber: 389,
+                                                        lineNumber: 420,
                                                         columnNumber: 23
                                                     }, this),
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -3510,13 +3761,13 @@ function Home() {
                                                         children: "Super"
                                                     }, void 0, false, {
                                                         fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                                                        lineNumber: 390,
+                                                        lineNumber: 421,
                                                         columnNumber: 23
                                                     }, this)
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                                                lineNumber: 388,
+                                                lineNumber: 419,
                                                 columnNumber: 21
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -3527,14 +3778,14 @@ function Home() {
                                                         children: "→"
                                                     }, void 0, false, {
                                                         fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                                                        lineNumber: 393,
+                                                        lineNumber: 424,
                                                         columnNumber: 23
                                                     }, this),
                                                     "Approve"
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                                                lineNumber: 392,
+                                                lineNumber: 423,
                                                 columnNumber: 21
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -3545,26 +3796,26 @@ function Home() {
                                                         children: "Z"
                                                     }, void 0, false, {
                                                         fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                                                        lineNumber: 397,
+                                                        lineNumber: 428,
                                                         columnNumber: 23
                                                     }, this),
                                                     "Undo"
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                                                lineNumber: 396,
+                                                lineNumber: 427,
                                                 columnNumber: 21
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                                        lineNumber: 383,
+                                        lineNumber: 414,
                                         columnNumber: 19
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                                lineNumber: 365,
+                                lineNumber: 396,
                                 columnNumber: 17
                             }, this)
                         ]
@@ -3586,12 +3837,12 @@ function Home() {
                                     children: "🎉"
                                 }, void 0, false, {
                                     fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                                    lineNumber: 410,
+                                    lineNumber: 441,
                                     columnNumber: 19
                                 }, this)
                             }, void 0, false, {
                                 fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                                lineNumber: 409,
+                                lineNumber: 440,
                                 columnNumber: 17
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("h2", {
@@ -3599,7 +3850,7 @@ function Home() {
                                 children: "All caught up!"
                             }, void 0, false, {
                                 fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                                lineNumber: 412,
+                                lineNumber: 443,
                                 columnNumber: 17
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -3607,7 +3858,7 @@ function Home() {
                                 children: "No more pending leads to review. Run the scraper to find more!"
                             }, void 0, false, {
                                 fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                                lineNumber: 415,
+                                lineNumber: 446,
                                 columnNumber: 17
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -3616,13 +3867,13 @@ function Home() {
                                 children: "Check for new leads"
                             }, void 0, false, {
                                 fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                                lineNumber: 418,
+                                lineNumber: 449,
                                 columnNumber: 17
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                        lineNumber: 404,
+                        lineNumber: 435,
                         columnNumber: 15
                     }, this)
                 }, void 0, false) : // List mode for approved/rejected/superliked/contacted leads
@@ -3649,23 +3900,23 @@ function Home() {
                         }
                     }, void 0, false, {
                         fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                        lineNumber: 434,
+                        lineNumber: 465,
                         columnNumber: 13
                     }, this)
                 }, void 0, false, {
                     fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                    lineNumber: 429,
+                    lineNumber: 460,
                     columnNumber: 11
                 }, this)
             }, void 0, false, {
                 fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                lineNumber: 331,
+                lineNumber: 362,
                 columnNumber: 7
             }, this)
         ]
     }, void 0, true, {
         fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-        lineNumber: 275,
+        lineNumber: 306,
         columnNumber: 5
     }, this);
 }
