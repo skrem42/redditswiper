@@ -333,4 +333,161 @@ class SupabaseClient:
             print(f"Error fetching keywords: {e}")
             return []
 
+    # ==================== Subreddit Queue (Crawler) ====================
+
+    async def enqueue_subreddit(
+        self, 
+        name: str, 
+        discovered_from: str = None, 
+        discovered_via_user: str = None, 
+        subscribers: int = 0,
+        is_nsfw: bool = True
+    ) -> bool:
+        """
+        Add a subreddit to the crawl queue if not already known.
+        Returns True if added, False if already exists.
+        """
+        try:
+            # Check if already exists in queue
+            existing = self.client.table("subreddit_queue").select("id").eq(
+                "subreddit_name", name.lower()
+            ).execute()
+            
+            if existing.data:
+                return False  # Already in queue
+            
+            self.client.table("subreddit_queue").insert({
+                "subreddit_name": name.lower(),
+                "discovered_from": discovered_from,
+                "discovered_via_user": discovered_via_user,
+                "subscribers": subscribers,
+                "is_nsfw": is_nsfw,
+                "status": "pending",
+            }).execute()
+            return True
+        except Exception as e:
+            print(f"Error enqueueing subreddit {name}: {e}")
+            return False
+
+    async def claim_next_subreddit(self, min_subscribers: int = 0) -> Optional[dict]:
+        """
+        Claim the next pending subreddit from the queue.
+        Prioritizes by subscriber count (higher = first) to avoid rabbit holes.
+        Returns the subreddit entry or None if queue is empty.
+        """
+        try:
+            # Get next pending subreddit, prioritized by subscriber count
+            # This helps avoid going down niche rabbit holes
+            query = self.client.table("subreddit_queue").select("*").eq(
+                "status", "pending"
+            )
+            
+            # Optionally filter by minimum subscribers
+            if min_subscribers > 0:
+                query = query.gte("subscribers", min_subscribers)
+            
+            result = query.order(
+                "subscribers", desc=True  # Bigger subs first
+            ).order(
+                "created_at", desc=False  # Then by age (FIFO)
+            ).limit(1).execute()
+            
+            if not result.data:
+                # If no subs match min_subscribers, try without the filter
+                if min_subscribers > 0:
+                    return await self.claim_next_subreddit(min_subscribers=0)
+                return None
+            
+            sub = result.data[0]
+            
+            # Mark as processing (atomic claim)
+            self.client.table("subreddit_queue").update({
+                "status": "processing",
+                "updated_at": datetime.utcnow().isoformat(),
+            }).eq("id", sub["id"]).eq("status", "pending").execute()
+            
+            return sub
+        except Exception as e:
+            print(f"Error claiming next subreddit: {e}")
+            return None
+
+    async def complete_subreddit_crawl(self, queue_id: str) -> None:
+        """Mark a subreddit as successfully crawled."""
+        try:
+            self.client.table("subreddit_queue").update({
+                "status": "completed",
+                "times_crawled": 1,
+                "last_crawled_at": datetime.utcnow().isoformat(),
+                "updated_at": datetime.utcnow().isoformat(),
+            }).eq("id", queue_id).execute()
+        except Exception as e:
+            print(f"Error completing subreddit crawl {queue_id}: {e}")
+
+    async def fail_subreddit_crawl(self, queue_id: str, error_message: str) -> None:
+        """Mark a subreddit crawl as failed."""
+        try:
+            self.client.table("subreddit_queue").update({
+                "status": "failed",
+                "error_message": error_message,
+                "updated_at": datetime.utcnow().isoformat(),
+            }).eq("id", queue_id).execute()
+        except Exception as e:
+            print(f"Error failing subreddit crawl {queue_id}: {e}")
+
+    async def get_queue_count(self, status: str = None) -> int:
+        """Get count of items in the subreddit queue."""
+        try:
+            query = self.client.table("subreddit_queue").select("id", count="exact")
+            if status:
+                query = query.eq("status", status)
+            result = query.execute()
+            return result.count or 0
+        except Exception as e:
+            print(f"Error getting queue count: {e}")
+            return 0
+
+    async def get_queue_stats(self) -> dict:
+        """Get statistics about the crawler queue."""
+        try:
+            result = self.client.table("subreddit_queue").select("status").execute()
+            data = result.data or []
+            
+            return {
+                "total": len(data),
+                "pending": len([s for s in data if s["status"] == "pending"]),
+                "processing": len([s for s in data if s["status"] == "processing"]),
+                "completed": len([s for s in data if s["status"] == "completed"]),
+                "failed": len([s for s in data if s["status"] == "failed"]),
+            }
+        except Exception as e:
+            print(f"Error getting queue stats: {e}")
+            return {"total": 0, "pending": 0, "processing": 0, "completed": 0, "failed": 0}
+
+    async def reset_stale_processing(self, minutes: int = 30) -> int:
+        """
+        Reset subreddits stuck in 'processing' state (crashed workers).
+        Returns count of reset entries.
+        """
+        try:
+            cutoff = datetime.utcnow()
+            # Note: Supabase doesn't have great datetime math, so we fetch and filter
+            result = self.client.table("subreddit_queue").select("id, updated_at").eq(
+                "status", "processing"
+            ).execute()
+            
+            reset_count = 0
+            for entry in result.data or []:
+                updated = datetime.fromisoformat(entry["updated_at"].replace("Z", "+00:00"))
+                if (cutoff - updated.replace(tzinfo=None)).total_seconds() > minutes * 60:
+                    self.client.table("subreddit_queue").update({
+                        "status": "pending",
+                        "updated_at": cutoff.isoformat(),
+                    }).eq("id", entry["id"]).execute()
+                    reset_count += 1
+            
+            return reset_count
+        except Exception as e:
+            print(f"Error resetting stale processing: {e}")
+            return 0
+
 

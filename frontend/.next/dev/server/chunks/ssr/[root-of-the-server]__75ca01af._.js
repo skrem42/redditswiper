@@ -15,6 +15,8 @@ __turbopack_context__.s([
     ()=>addSearchKeyword,
     "deleteKeyword",
     ()=>deleteKeyword,
+    "getContactedLeads",
+    ()=>getContactedLeads,
     "getLeadsByStatus",
     ()=>getLeadsByStatus,
     "getLeadsBySubreddit",
@@ -33,14 +35,20 @@ __turbopack_context__.s([
     ()=>getSubreddits,
     "getSupabase",
     ()=>getSupabase,
+    "markLeadContacted",
+    ()=>markLeadContacted,
     "queueScrapeJob",
     ()=>queueScrapeJob,
     "supabase",
     ()=>supabase,
     "toggleKeywordActive",
     ()=>toggleKeywordActive,
+    "unmarkLeadContacted",
+    ()=>unmarkLeadContacted,
     "updateKeywordPriority",
     ()=>updateKeywordPriority,
+    "updateLeadNotes",
+    ()=>updateLeadNotes,
     "updateLeadStatus",
     ()=>updateLeadStatus
 ]);
@@ -98,7 +106,7 @@ async function updateLeadStatus(leadId, status, notes) {
     return true;
 }
 async function getStats() {
-    const { data: leads } = await supabase.from("reddit_leads").select("id, status");
+    const { data: leads } = await supabase.from("reddit_leads").select("id, status, contacted_at");
     const { count: postsCount } = await supabase.from("reddit_posts").select("*", {
         count: "exact",
         head: true
@@ -115,7 +123,8 @@ async function getStats() {
         pending_leads: leadsData.filter((l)=>l.status === "pending").length,
         approved_leads: leadsData.filter((l)=>l.status === "approved").length,
         rejected_leads: leadsData.filter((l)=>l.status === "rejected").length,
-        superliked_leads: leadsData.filter((l)=>l.status === "superliked").length
+        superliked_leads: leadsData.filter((l)=>l.status === "superliked").length,
+        contacted_leads: leadsData.filter((l)=>l.contacted_at !== null).length
     };
 }
 async function getSubreddits() {
@@ -279,6 +288,53 @@ async function addKeywordAndScrape(keyword) {
         keyword: savedKeyword,
         job
     };
+}
+async function markLeadContacted(leadId, notes) {
+    const updateData = {
+        contacted_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+    };
+    if (notes !== undefined) {
+        updateData.notes = notes;
+    }
+    const { error } = await supabase.from("reddit_leads").update(updateData).eq("id", leadId);
+    if (error) {
+        console.error("Error marking lead as contacted:", error);
+        return false;
+    }
+    return true;
+}
+async function unmarkLeadContacted(leadId) {
+    const { error } = await supabase.from("reddit_leads").update({
+        contacted_at: null,
+        updated_at: new Date().toISOString()
+    }).eq("id", leadId);
+    if (error) {
+        console.error("Error unmarking lead as contacted:", error);
+        return false;
+    }
+    return true;
+}
+async function updateLeadNotes(leadId, notes) {
+    const { error } = await supabase.from("reddit_leads").update({
+        notes,
+        updated_at: new Date().toISOString()
+    }).eq("id", leadId);
+    if (error) {
+        console.error("Error updating lead notes:", error);
+        return false;
+    }
+    return true;
+}
+async function getContactedLeads(limit = 50, offset = 0) {
+    const { data, error } = await supabase.from("reddit_leads").select("*, reddit_posts(*)").not("contacted_at", "is", null).order("contacted_at", {
+        ascending: false
+    }).range(offset, offset + limit - 1);
+    if (error) {
+        console.error("Error fetching contacted leads:", error);
+        return [];
+    }
+    return data || [];
 }
 }),
 "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx [app-ssr] (ecmascript)", ((__turbopack_context__) => {
@@ -1366,6 +1422,7 @@ var __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$
 var __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$circle$2d$x$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__XCircle$3e$__ = __turbopack_context__.i("[project]/Desktop/redditscraper/frontend/node_modules/lucide-react/dist/esm/icons/circle-x.js [app-ssr] (ecmascript) <export default as XCircle>");
 var __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$clock$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__Clock$3e$__ = __turbopack_context__.i("[project]/Desktop/redditscraper/frontend/node_modules/lucide-react/dist/esm/icons/clock.js [app-ssr] (ecmascript) <export default as Clock>");
 var __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$star$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__Star$3e$__ = __turbopack_context__.i("[project]/Desktop/redditscraper/frontend/node_modules/lucide-react/dist/esm/icons/star.js [app-ssr] (ecmascript) <export default as Star>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$message$2d$circle$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__MessageCircle$3e$__ = __turbopack_context__.i("[project]/Desktop/redditscraper/frontend/node_modules/lucide-react/dist/esm/icons/message-circle.js [app-ssr] (ecmascript) <export default as MessageCircle>");
 "use client";
 ;
 ;
@@ -1399,6 +1456,15 @@ function StatsBar({ stats, currentFilter, onFilterChange }) {
             borderColor: "border-success/30"
         },
         {
+            id: "contacted",
+            label: "Contacted",
+            count: stats.contacted_leads,
+            icon: __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$message$2d$circle$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__MessageCircle$3e$__["MessageCircle"],
+            color: "text-blue-500",
+            bgColor: "bg-blue-500/10",
+            borderColor: "border-blue-500/30"
+        },
+        {
             id: "rejected",
             label: "Rejected",
             count: stats.rejected_leads,
@@ -1422,7 +1488,7 @@ function StatsBar({ stats, currentFilter, onFilterChange }) {
                                 size: 20
                             }, void 0, false, {
                                 fileName: "[project]/Desktop/redditscraper/frontend/src/components/StatsBar.tsx",
-                                lineNumber: 56,
+                                lineNumber: 65,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -1433,13 +1499,13 @@ function StatsBar({ stats, currentFilter, onFilterChange }) {
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/Desktop/redditscraper/frontend/src/components/StatsBar.tsx",
-                                lineNumber: 57,
+                                lineNumber: 66,
                                 columnNumber: 11
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/Desktop/redditscraper/frontend/src/components/StatsBar.tsx",
-                        lineNumber: 55,
+                        lineNumber: 64,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1453,13 +1519,13 @@ function StatsBar({ stats, currentFilter, onFilterChange }) {
                         ]
                     }, void 0, true, {
                         fileName: "[project]/Desktop/redditscraper/frontend/src/components/StatsBar.tsx",
-                        lineNumber: 61,
+                        lineNumber: 70,
                         columnNumber: 9
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/Desktop/redditscraper/frontend/src/components/StatsBar.tsx",
-                lineNumber: 54,
+                lineNumber: 63,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1472,7 +1538,7 @@ function StatsBar({ stats, currentFilter, onFilterChange }) {
                                 size: 18
                             }, void 0, false, {
                                 fileName: "[project]/Desktop/redditscraper/frontend/src/components/StatsBar.tsx",
-                                lineNumber: 78,
+                                lineNumber: 87,
                                 columnNumber: 13
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -1480,7 +1546,7 @@ function StatsBar({ stats, currentFilter, onFilterChange }) {
                                 children: filter.label
                             }, void 0, false, {
                                 fileName: "[project]/Desktop/redditscraper/frontend/src/components/StatsBar.tsx",
-                                lineNumber: 79,
+                                lineNumber: 88,
                                 columnNumber: 13
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -1488,24 +1554,24 @@ function StatsBar({ stats, currentFilter, onFilterChange }) {
                                 children: filter.count
                             }, void 0, false, {
                                 fileName: "[project]/Desktop/redditscraper/frontend/src/components/StatsBar.tsx",
-                                lineNumber: 80,
+                                lineNumber: 89,
                                 columnNumber: 13
                             }, this)
                         ]
                     }, filter.id, true, {
                         fileName: "[project]/Desktop/redditscraper/frontend/src/components/StatsBar.tsx",
-                        lineNumber: 69,
+                        lineNumber: 78,
                         columnNumber: 11
                     }, this))
             }, void 0, false, {
                 fileName: "[project]/Desktop/redditscraper/frontend/src/components/StatsBar.tsx",
-                lineNumber: 67,
+                lineNumber: 76,
                 columnNumber: 7
             }, this)
         ]
     }, void 0, true, {
         fileName: "[project]/Desktop/redditscraper/frontend/src/components/StatsBar.tsx",
-        lineNumber: 53,
+        lineNumber: 62,
         columnNumber: 5
     }, this);
 }
@@ -1518,13 +1584,78 @@ __turbopack_context__.s([
     ()=>LeadsList
 ]);
 var __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/Desktop/redditscraper/frontend/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react-jsx-dev-runtime.js [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/Desktop/redditscraper/frontend/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$external$2d$link$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__ExternalLink$3e$__ = __turbopack_context__.i("[project]/Desktop/redditscraper/frontend/node_modules/lucide-react/dist/esm/icons/external-link.js [app-ssr] (ecmascript) <export default as ExternalLink>");
 var __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$rotate$2d$ccw$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__RotateCcw$3e$__ = __turbopack_context__.i("[project]/Desktop/redditscraper/frontend/node_modules/lucide-react/dist/esm/icons/rotate-ccw.js [app-ssr] (ecmascript) <export default as RotateCcw>");
 var __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$arrow$2d$left$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__ArrowLeft$3e$__ = __turbopack_context__.i("[project]/Desktop/redditscraper/frontend/node_modules/lucide-react/dist/esm/icons/arrow-left.js [app-ssr] (ecmascript) <export default as ArrowLeft>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$check$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__Check$3e$__ = __turbopack_context__.i("[project]/Desktop/redditscraper/frontend/node_modules/lucide-react/dist/esm/icons/check.js [app-ssr] (ecmascript) <export default as Check>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$message$2d$circle$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__MessageCircle$3e$__ = __turbopack_context__.i("[project]/Desktop/redditscraper/frontend/node_modules/lucide-react/dist/esm/icons/message-circle.js [app-ssr] (ecmascript) <export default as MessageCircle>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$chevron$2d$down$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__ChevronDown$3e$__ = __turbopack_context__.i("[project]/Desktop/redditscraper/frontend/node_modules/lucide-react/dist/esm/icons/chevron-down.js [app-ssr] (ecmascript) <export default as ChevronDown>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$chevron$2d$up$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__ChevronUp$3e$__ = __turbopack_context__.i("[project]/Desktop/redditscraper/frontend/node_modules/lucide-react/dist/esm/icons/chevron-up.js [app-ssr] (ecmascript) <export default as ChevronUp>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$star$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__Star$3e$__ = __turbopack_context__.i("[project]/Desktop/redditscraper/frontend/node_modules/lucide-react/dist/esm/icons/star.js [app-ssr] (ecmascript) <export default as Star>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$src$2f$lib$2f$supabase$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/Desktop/redditscraper/frontend/src/lib/supabase.ts [app-ssr] (ecmascript)");
 "use client";
 ;
 ;
-function LeadsList({ leads, onRestore, showRestore = false, onBack, title }) {
+;
+;
+function LeadsList({ leads, onRestore, showRestore = false, onBack, title, showContactCheckbox = false, onLeadUpdate }) {
+    const [expandedLead, setExpandedLead] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(null);
+    const [localLeads, setLocalLeads] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])({});
+    const [savingNotes, setSavingNotes] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(null);
+    const handleContactToggle = async (lead)=>{
+        const isCurrentlyContacted = lead.contacted_at !== null || localLeads[lead.id]?.contacted;
+        // Optimistic update
+        setLocalLeads((prev)=>({
+                ...prev,
+                [lead.id]: {
+                    ...prev[lead.id],
+                    contacted: !isCurrentlyContacted,
+                    notes: prev[lead.id]?.notes || lead.notes || ""
+                }
+            }));
+        if (isCurrentlyContacted) {
+            await (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$src$2f$lib$2f$supabase$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["unmarkLeadContacted"])(lead.id);
+        } else {
+            await (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$src$2f$lib$2f$supabase$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["markLeadContacted"])(lead.id);
+        }
+        onLeadUpdate?.();
+    };
+    const handleNotesChange = (leadId, notes)=>{
+        setLocalLeads((prev)=>({
+                ...prev,
+                [leadId]: {
+                    ...prev[leadId],
+                    notes
+                }
+            }));
+    };
+    const handleNotesSave = async (leadId)=>{
+        const notes = localLeads[leadId]?.notes || "";
+        setSavingNotes(leadId);
+        await (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$src$2f$lib$2f$supabase$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["updateLeadNotes"])(leadId, notes);
+        setSavingNotes(null);
+        onLeadUpdate?.();
+    };
+    const isContacted = (lead)=>{
+        if (localLeads[lead.id]?.contacted !== undefined) {
+            return localLeads[lead.id].contacted;
+        }
+        return lead.contacted_at !== null;
+    };
+    const getNotes = (lead)=>{
+        return localLeads[lead.id]?.notes ?? lead.notes ?? "";
+    };
+    const formatContactedDate = (dateStr)=>{
+        if (!dateStr) return null;
+        const date = new Date(dateStr);
+        return date.toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+            hour: "2-digit",
+            minute: "2-digit"
+        });
+    };
     return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
         className: "space-y-4",
         children: [
@@ -1539,20 +1670,20 @@ function LeadsList({ leads, onRestore, showRestore = false, onBack, title }) {
                                 size: 18
                             }, void 0, false, {
                                 fileName: "[project]/Desktop/redditscraper/frontend/src/components/LeadsList.tsx",
-                                lineNumber: 24,
+                                lineNumber: 102,
                                 columnNumber: 13
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                 children: "Back to Swiper"
                             }, void 0, false, {
                                 fileName: "[project]/Desktop/redditscraper/frontend/src/components/LeadsList.tsx",
-                                lineNumber: 25,
+                                lineNumber: 103,
                                 columnNumber: 13
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/Desktop/redditscraper/frontend/src/components/LeadsList.tsx",
-                        lineNumber: 20,
+                        lineNumber: 98,
                         columnNumber: 11
                     }, this),
                     title && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("h2", {
@@ -1560,13 +1691,13 @@ function LeadsList({ leads, onRestore, showRestore = false, onBack, title }) {
                         children: title
                     }, void 0, false, {
                         fileName: "[project]/Desktop/redditscraper/frontend/src/components/LeadsList.tsx",
-                        lineNumber: 28,
+                        lineNumber: 106,
                         columnNumber: 13
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/Desktop/redditscraper/frontend/src/components/LeadsList.tsx",
-                lineNumber: 19,
+                lineNumber: 97,
                 columnNumber: 9
             }, this),
             leads.length === 0 ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1575,169 +1706,320 @@ function LeadsList({ leads, onRestore, showRestore = false, onBack, title }) {
                     children: "No leads in this category"
                 }, void 0, false, {
                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/LeadsList.tsx",
-                    lineNumber: 35,
+                    lineNumber: 113,
                     columnNumber: 11
                 }, this)
             }, void 0, false, {
                 fileName: "[project]/Desktop/redditscraper/frontend/src/components/LeadsList.tsx",
-                lineNumber: 34,
+                lineNumber: 112,
                 columnNumber: 9
             }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                 className: "space-y-3 max-h-[60vh] overflow-y-auto pr-2",
-                children: leads.map((lead)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                        className: "bg-card rounded-xl p-4 flex items-center gap-4 hover:bg-card/80 transition-colors",
+                children: leads.map((lead)=>{
+                    const contacted = isContacted(lead);
+                    const isExpanded = expandedLead === lead.id;
+                    return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                        className: `bg-card rounded-xl transition-colors ${contacted ? "border-l-4 border-l-blue-500" : ""}`,
                         children: [
-                            lead.avatar_url ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("img", {
-                                src: lead.avatar_url,
-                                alt: lead.reddit_username,
-                                className: "w-12 h-12 rounded-full object-cover border border-border"
-                            }, void 0, false, {
-                                fileName: "[project]/Desktop/redditscraper/frontend/src/components/LeadsList.tsx",
-                                lineNumber: 46,
-                                columnNumber: 13
-                            }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                className: "w-12 h-12 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-lg font-bold text-white",
-                                children: lead.reddit_username.charAt(0).toUpperCase()
-                            }, void 0, false, {
-                                fileName: "[project]/Desktop/redditscraper/frontend/src/components/LeadsList.tsx",
-                                lineNumber: 52,
-                                columnNumber: 13
-                            }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                className: "flex-1 min-w-0",
+                                className: "p-4 flex items-center gap-4",
                                 children: [
-                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                        className: "flex items-center gap-2",
-                                        children: [
-                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                                className: "font-medium text-foreground truncate",
-                                                children: [
-                                                    "u/",
-                                                    lead.reddit_username
-                                                ]
-                                            }, void 0, true, {
-                                                fileName: "[project]/Desktop/redditscraper/frontend/src/components/LeadsList.tsx",
-                                                lineNumber: 60,
-                                                columnNumber: 15
-                                            }, this),
-                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("a", {
-                                                href: lead.profile_url,
-                                                target: "_blank",
-                                                rel: "noopener noreferrer",
-                                                className: "text-muted-foreground hover:text-accent",
-                                                children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$external$2d$link$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__ExternalLink$3e$__["ExternalLink"], {
-                                                    size: 14
-                                                }, void 0, false, {
-                                                    fileName: "[project]/Desktop/redditscraper/frontend/src/components/LeadsList.tsx",
-                                                    lineNumber: 69,
-                                                    columnNumber: 17
-                                                }, this)
-                                            }, void 0, false, {
-                                                fileName: "[project]/Desktop/redditscraper/frontend/src/components/LeadsList.tsx",
-                                                lineNumber: 63,
-                                                columnNumber: 15
-                                            }, this)
-                                        ]
-                                    }, void 0, true, {
+                                    showContactCheckbox && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                        onClick: ()=>handleContactToggle(lead),
+                                        className: `w-6 h-6 rounded-md border-2 flex items-center justify-center transition-all flex-shrink-0 ${contacted ? "bg-blue-500 border-blue-500 text-white" : "border-muted-foreground/40 hover:border-blue-500"}`,
+                                        title: contacted ? "Mark as not contacted" : "Mark as contacted",
+                                        children: contacted && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$check$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__Check$3e$__["Check"], {
+                                            size: 14,
+                                            strokeWidth: 3
+                                        }, void 0, false, {
+                                            fileName: "[project]/Desktop/redditscraper/frontend/src/components/LeadsList.tsx",
+                                            lineNumber: 141,
+                                            columnNumber: 37
+                                        }, this)
+                                    }, void 0, false, {
                                         fileName: "[project]/Desktop/redditscraper/frontend/src/components/LeadsList.tsx",
-                                        lineNumber: 59,
-                                        columnNumber: 13
+                                        lineNumber: 132,
+                                        columnNumber: 21
+                                    }, this),
+                                    lead.avatar_url ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("img", {
+                                        src: lead.avatar_url,
+                                        alt: lead.reddit_username,
+                                        className: "w-12 h-12 rounded-full object-cover border border-border flex-shrink-0"
+                                    }, void 0, false, {
+                                        fileName: "[project]/Desktop/redditscraper/frontend/src/components/LeadsList.tsx",
+                                        lineNumber: 147,
+                                        columnNumber: 21
+                                    }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                        className: "w-12 h-12 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-lg font-bold text-white flex-shrink-0",
+                                        children: lead.reddit_username.charAt(0).toUpperCase()
+                                    }, void 0, false, {
+                                        fileName: "[project]/Desktop/redditscraper/frontend/src/components/LeadsList.tsx",
+                                        lineNumber: 153,
+                                        columnNumber: 21
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                        className: "flex items-center gap-3 text-xs text-muted-foreground mt-1",
+                                        className: "flex-1 min-w-0",
                                         children: [
-                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                className: "flex items-center gap-2",
                                                 children: [
-                                                    "↑ ",
-                                                    lead.karma.toLocaleString()
+                                                    lead.status === "superliked" && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$star$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__Star$3e$__["Star"], {
+                                                        size: 14,
+                                                        className: "text-amber-500 fill-amber-500 flex-shrink-0"
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/Desktop/redditscraper/frontend/src/components/LeadsList.tsx",
+                                                        lineNumber: 162,
+                                                        columnNumber: 25
+                                                    }, this),
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                                        className: `font-medium truncate ${contacted ? "text-muted-foreground" : "text-foreground"}`,
+                                                        children: [
+                                                            "u/",
+                                                            lead.reddit_username
+                                                        ]
+                                                    }, void 0, true, {
+                                                        fileName: "[project]/Desktop/redditscraper/frontend/src/components/LeadsList.tsx",
+                                                        lineNumber: 164,
+                                                        columnNumber: 23
+                                                    }, this),
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("a", {
+                                                        href: lead.profile_url,
+                                                        target: "_blank",
+                                                        rel: "noopener noreferrer",
+                                                        className: "text-muted-foreground hover:text-accent flex-shrink-0",
+                                                        children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$external$2d$link$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__ExternalLink$3e$__["ExternalLink"], {
+                                                            size: 14
+                                                        }, void 0, false, {
+                                                            fileName: "[project]/Desktop/redditscraper/frontend/src/components/LeadsList.tsx",
+                                                            lineNumber: 173,
+                                                            columnNumber: 25
+                                                        }, this)
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/Desktop/redditscraper/frontend/src/components/LeadsList.tsx",
+                                                        lineNumber: 167,
+                                                        columnNumber: 23
+                                                    }, this)
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/Desktop/redditscraper/frontend/src/components/LeadsList.tsx",
-                                                lineNumber: 73,
-                                                columnNumber: 15
+                                                lineNumber: 160,
+                                                columnNumber: 21
                                             }, this),
-                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                className: "flex items-center gap-3 text-xs text-muted-foreground mt-1 flex-wrap",
                                                 children: [
-                                                    lead.total_posts,
-                                                    " posts"
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                                        children: [
+                                                            "↑ ",
+                                                            lead.karma.toLocaleString()
+                                                        ]
+                                                    }, void 0, true, {
+                                                        fileName: "[project]/Desktop/redditscraper/frontend/src/components/LeadsList.tsx",
+                                                        lineNumber: 177,
+                                                        columnNumber: 23
+                                                    }, this),
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                                        children: [
+                                                            lead.total_posts,
+                                                            " posts"
+                                                        ]
+                                                    }, void 0, true, {
+                                                        fileName: "[project]/Desktop/redditscraper/frontend/src/components/LeadsList.tsx",
+                                                        lineNumber: 178,
+                                                        columnNumber: 23
+                                                    }, this),
+                                                    lead.extracted_links.length > 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                                        className: "text-accent",
+                                                        children: [
+                                                            lead.extracted_links.length,
+                                                            " links"
+                                                        ]
+                                                    }, void 0, true, {
+                                                        fileName: "[project]/Desktop/redditscraper/frontend/src/components/LeadsList.tsx",
+                                                        lineNumber: 180,
+                                                        columnNumber: 25
+                                                    }, this),
+                                                    contacted && lead.contacted_at && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                                        className: "flex items-center gap-1 text-blue-500",
+                                                        children: [
+                                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$message$2d$circle$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__MessageCircle$3e$__["MessageCircle"], {
+                                                                size: 10
+                                                            }, void 0, false, {
+                                                                fileName: "[project]/Desktop/redditscraper/frontend/src/components/LeadsList.tsx",
+                                                                lineNumber: 186,
+                                                                columnNumber: 27
+                                                            }, this),
+                                                            formatContactedDate(lead.contacted_at)
+                                                        ]
+                                                    }, void 0, true, {
+                                                        fileName: "[project]/Desktop/redditscraper/frontend/src/components/LeadsList.tsx",
+                                                        lineNumber: 185,
+                                                        columnNumber: 25
+                                                    }, this)
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/Desktop/redditscraper/frontend/src/components/LeadsList.tsx",
-                                                lineNumber: 74,
-                                                columnNumber: 15
-                                            }, this),
-                                            lead.extracted_links.length > 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                                className: "text-accent",
-                                                children: [
-                                                    lead.extracted_links.length,
-                                                    " links"
-                                                ]
-                                            }, void 0, true, {
-                                                fileName: "[project]/Desktop/redditscraper/frontend/src/components/LeadsList.tsx",
-                                                lineNumber: 76,
-                                                columnNumber: 17
+                                                lineNumber: 176,
+                                                columnNumber: 21
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/Desktop/redditscraper/frontend/src/components/LeadsList.tsx",
-                                        lineNumber: 72,
-                                        columnNumber: 13
+                                        lineNumber: 159,
+                                        columnNumber: 19
+                                    }, this),
+                                    lead.extracted_links.length > 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                        className: "hidden lg:flex gap-1 flex-shrink-0",
+                                        children: lead.extracted_links.slice(0, 2).map((link, idx)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("a", {
+                                                href: link,
+                                                target: "_blank",
+                                                rel: "noopener noreferrer",
+                                                className: "px-2 py-1 rounded-full bg-accent/10 text-accent text-xs hover:bg-accent/20 transition-colors",
+                                                children: link.includes("onlyfans") ? "🔥 OF" : "🔗 Link"
+                                            }, idx, false, {
+                                                fileName: "[project]/Desktop/redditscraper/frontend/src/components/LeadsList.tsx",
+                                                lineNumber: 197,
+                                                columnNumber: 25
+                                            }, this))
+                                    }, void 0, false, {
+                                        fileName: "[project]/Desktop/redditscraper/frontend/src/components/LeadsList.tsx",
+                                        lineNumber: 195,
+                                        columnNumber: 21
+                                    }, this),
+                                    showContactCheckbox && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                        onClick: ()=>setExpandedLead(isExpanded ? null : lead.id),
+                                        className: "p-2 rounded-lg bg-secondary hover:bg-secondary/80 text-muted-foreground hover:text-foreground transition-colors flex-shrink-0",
+                                        title: "Add notes",
+                                        children: isExpanded ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$chevron$2d$up$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__ChevronUp$3e$__["ChevronUp"], {
+                                            size: 16
+                                        }, void 0, false, {
+                                            fileName: "[project]/Desktop/redditscraper/frontend/src/components/LeadsList.tsx",
+                                            lineNumber: 217,
+                                            columnNumber: 37
+                                        }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$chevron$2d$down$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__ChevronDown$3e$__["ChevronDown"], {
+                                            size: 16
+                                        }, void 0, false, {
+                                            fileName: "[project]/Desktop/redditscraper/frontend/src/components/LeadsList.tsx",
+                                            lineNumber: 217,
+                                            columnNumber: 63
+                                        }, this)
+                                    }, void 0, false, {
+                                        fileName: "[project]/Desktop/redditscraper/frontend/src/components/LeadsList.tsx",
+                                        lineNumber: 212,
+                                        columnNumber: 21
+                                    }, this),
+                                    showRestore && onRestore && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                        onClick: ()=>onRestore(lead.id),
+                                        className: "p-2 rounded-lg bg-secondary hover:bg-secondary/80 text-muted-foreground hover:text-foreground transition-colors flex-shrink-0",
+                                        title: "Move back to pending",
+                                        children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$rotate$2d$ccw$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__RotateCcw$3e$__["RotateCcw"], {
+                                            size: 16
+                                        }, void 0, false, {
+                                            fileName: "[project]/Desktop/redditscraper/frontend/src/components/LeadsList.tsx",
+                                            lineNumber: 228,
+                                            columnNumber: 23
+                                        }, this)
+                                    }, void 0, false, {
+                                        fileName: "[project]/Desktop/redditscraper/frontend/src/components/LeadsList.tsx",
+                                        lineNumber: 223,
+                                        columnNumber: 21
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/Desktop/redditscraper/frontend/src/components/LeadsList.tsx",
-                                lineNumber: 58,
-                                columnNumber: 11
+                                lineNumber: 129,
+                                columnNumber: 17
                             }, this),
-                            lead.extracted_links.length > 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                className: "hidden md:flex gap-1",
-                                children: lead.extracted_links.slice(0, 2).map((link, idx)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("a", {
-                                        href: link,
-                                        target: "_blank",
-                                        rel: "noopener noreferrer",
-                                        className: "px-2 py-1 rounded-full bg-accent/10 text-accent text-xs hover:bg-accent/20 transition-colors",
-                                        children: link.includes("onlyfans") ? "🔥 OF" : "🔗 Link"
-                                    }, idx, false, {
+                            isExpanded && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                className: "px-4 pb-4 pt-0 border-t border-border/50",
+                                children: [
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                        className: "mt-3",
+                                        children: [
+                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("label", {
+                                                className: "text-xs text-muted-foreground mb-1 block",
+                                                children: "Notes"
+                                            }, void 0, false, {
+                                                fileName: "[project]/Desktop/redditscraper/frontend/src/components/LeadsList.tsx",
+                                                lineNumber: 237,
+                                                columnNumber: 23
+                                            }, this),
+                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                className: "flex gap-2",
+                                                children: [
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("textarea", {
+                                                        value: getNotes(lead),
+                                                        onChange: (e)=>handleNotesChange(lead.id, e.target.value),
+                                                        placeholder: "Add notes about this lead...",
+                                                        className: "flex-1 bg-secondary/50 rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-accent/50",
+                                                        rows: 2
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/Desktop/redditscraper/frontend/src/components/LeadsList.tsx",
+                                                        lineNumber: 239,
+                                                        columnNumber: 25
+                                                    }, this),
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                                        onClick: ()=>handleNotesSave(lead.id),
+                                                        disabled: savingNotes === lead.id,
+                                                        className: "px-3 py-2 rounded-lg bg-accent text-white text-sm hover:bg-accent/90 transition-colors disabled:opacity-50 self-end",
+                                                        children: savingNotes === lead.id ? "..." : "Save"
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/Desktop/redditscraper/frontend/src/components/LeadsList.tsx",
+                                                        lineNumber: 246,
+                                                        columnNumber: 25
+                                                    }, this)
+                                                ]
+                                            }, void 0, true, {
+                                                fileName: "[project]/Desktop/redditscraper/frontend/src/components/LeadsList.tsx",
+                                                lineNumber: 238,
+                                                columnNumber: 23
+                                            }, this)
+                                        ]
+                                    }, void 0, true, {
                                         fileName: "[project]/Desktop/redditscraper/frontend/src/components/LeadsList.tsx",
-                                        lineNumber: 87,
-                                        columnNumber: 17
-                                    }, this))
-                            }, void 0, false, {
+                                        lineNumber: 236,
+                                        columnNumber: 21
+                                    }, this),
+                                    lead.extracted_links.length > 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                        className: "mt-3 flex flex-wrap gap-2",
+                                        children: lead.extracted_links.map((link, idx)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("a", {
+                                                href: link,
+                                                target: "_blank",
+                                                rel: "noopener noreferrer",
+                                                className: "px-3 py-1 rounded-full bg-accent/10 text-accent text-xs hover:bg-accent/20 transition-colors",
+                                                children: link.includes("onlyfans") ? "🔥 OnlyFans" : link.includes("linktree") ? "🌳 Linktree" : link.includes("instagram") ? "📷 Instagram" : link.includes("twitter") || link.includes("x.com") ? "𝕏 Twitter" : "🔗 " + new URL(link).hostname
+                                            }, idx, false, {
+                                                fileName: "[project]/Desktop/redditscraper/frontend/src/components/LeadsList.tsx",
+                                                lineNumber: 260,
+                                                columnNumber: 27
+                                            }, this))
+                                    }, void 0, false, {
+                                        fileName: "[project]/Desktop/redditscraper/frontend/src/components/LeadsList.tsx",
+                                        lineNumber: 258,
+                                        columnNumber: 23
+                                    }, this)
+                                ]
+                            }, void 0, true, {
                                 fileName: "[project]/Desktop/redditscraper/frontend/src/components/LeadsList.tsx",
-                                lineNumber: 85,
-                                columnNumber: 13
-                            }, this),
-                            showRestore && onRestore && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
-                                onClick: ()=>onRestore(lead.id),
-                                className: "p-2 rounded-lg bg-secondary hover:bg-secondary/80 text-muted-foreground hover:text-foreground transition-colors",
-                                title: "Move back to pending",
-                                children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$rotate$2d$ccw$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__RotateCcw$3e$__["RotateCcw"], {
-                                    size: 16
-                                }, void 0, false, {
-                                    fileName: "[project]/Desktop/redditscraper/frontend/src/components/LeadsList.tsx",
-                                    lineNumber: 107,
-                                    columnNumber: 15
-                                }, this)
-                            }, void 0, false, {
-                                fileName: "[project]/Desktop/redditscraper/frontend/src/components/LeadsList.tsx",
-                                lineNumber: 102,
-                                columnNumber: 13
+                                lineNumber: 235,
+                                columnNumber: 19
                             }, this)
                         ]
                     }, lead.id, true, {
                         fileName: "[project]/Desktop/redditscraper/frontend/src/components/LeadsList.tsx",
-                        lineNumber: 40,
-                        columnNumber: 9
-                    }, this))
+                        lineNumber: 122,
+                        columnNumber: 15
+                    }, this);
+                })
             }, void 0, false, {
                 fileName: "[project]/Desktop/redditscraper/frontend/src/components/LeadsList.tsx",
-                lineNumber: 38,
+                lineNumber: 116,
                 columnNumber: 9
             }, this)
         ]
     }, void 0, true, {
         fileName: "[project]/Desktop/redditscraper/frontend/src/components/LeadsList.tsx",
-        lineNumber: 16,
+        lineNumber: 94,
         columnNumber: 5
     }, this);
 }
@@ -2710,7 +2992,8 @@ function Home() {
         pending_leads: 0,
         approved_leads: 0,
         rejected_leads: 0,
-        superliked_leads: 0
+        superliked_leads: 0,
+        contacted_leads: 0
     });
     const [currentFilter, setCurrentFilter] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])("pending");
     const [isLoading, setIsLoading] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(true);
@@ -2754,6 +3037,9 @@ function Home() {
                 data = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$src$2f$lib$2f$supabase$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getLeadsBySubreddit"])(selectedSubreddit.id, currentFilter, 50);
             } else if (currentFilter === "pending") {
                 data = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$src$2f$lib$2f$supabase$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getPendingLeads"])(50);
+            } else if (currentFilter === "contacted") {
+                // Special filter for contacted leads (across all statuses)
+                data = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$src$2f$lib$2f$supabase$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getContactedLeads"])(50);
             } else {
                 data = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$src$2f$lib$2f$supabase$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getLeadsByStatus"])(currentFilter, 50);
             }
@@ -2931,14 +3217,14 @@ function Home() {
                                         className: "text-primary"
                                     }, void 0, false, {
                                         fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                                        lineNumber: 275,
+                                        lineNumber: 280,
                                         columnNumber: 13
                                     }, this),
                                     "Lead Swiper"
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                                lineNumber: 274,
+                                lineNumber: 279,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -2946,13 +3232,13 @@ function Home() {
                                 children: "Swipe through Reddit leads for your OF agency"
                             }, void 0, false, {
                                 fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                                lineNumber: 278,
+                                lineNumber: 283,
                                 columnNumber: 11
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                        lineNumber: 273,
+                        lineNumber: 278,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -2965,18 +3251,18 @@ function Home() {
                             className: isRefreshing ? "animate-spin" : ""
                         }, void 0, false, {
                             fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                            lineNumber: 288,
+                            lineNumber: 293,
                             columnNumber: 11
                         }, this)
                     }, void 0, false, {
                         fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                        lineNumber: 282,
+                        lineNumber: 287,
                         columnNumber: 9
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                lineNumber: 272,
+                lineNumber: 277,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -2995,7 +3281,7 @@ function Home() {
                                 pendingCounts: subredditPendingCounts
                             }, void 0, false, {
                                 fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                                lineNumber: 298,
+                                lineNumber: 303,
                                 columnNumber: 11
                             }, this),
                             selectedSubreddit && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -3006,26 +3292,26 @@ function Home() {
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                                lineNumber: 308,
+                                lineNumber: 313,
                                 columnNumber: 13
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                        lineNumber: 297,
+                        lineNumber: 302,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$src$2f$components$2f$KeywordManager$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["KeywordManager"], {
                         onJobQueued: ()=>fetchSubreddits()
                     }, void 0, false, {
                         fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                        lineNumber: 315,
+                        lineNumber: 320,
                         columnNumber: 9
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                lineNumber: 296,
+                lineNumber: 301,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$src$2f$components$2f$StatsBar$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["StatsBar"], {
@@ -3034,7 +3320,7 @@ function Home() {
                 onFilterChange: setCurrentFilter
             }, void 0, false, {
                 fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                lineNumber: 319,
+                lineNumber: 324,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3048,7 +3334,7 @@ function Home() {
                                 className: "w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto"
                             }, void 0, false, {
                                 fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                                lineNumber: 330,
+                                lineNumber: 335,
                                 columnNumber: 15
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -3056,18 +3342,18 @@ function Home() {
                                 children: "Loading leads..."
                             }, void 0, false, {
                                 fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                                lineNumber: 331,
+                                lineNumber: 336,
                                 columnNumber: 15
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                        lineNumber: 329,
+                        lineNumber: 334,
                         columnNumber: 13
                     }, this)
                 }, void 0, false, {
                     fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                    lineNumber: 328,
+                    lineNumber: 333,
                     columnNumber: 11
                 }, this) : showSwiper ? // Swipe mode for pending leads
                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Fragment"], {
@@ -3083,7 +3369,7 @@ function Home() {
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                                lineNumber: 340,
+                                lineNumber: 345,
                                 columnNumber: 17
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3097,17 +3383,17 @@ function Home() {
                                         isActive: true
                                     }, currentLead.id, false, {
                                         fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                                        lineNumber: 348,
+                                        lineNumber: 353,
                                         columnNumber: 23
                                     }, this)
                                 }, void 0, false, {
                                     fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                                    lineNumber: 346,
+                                    lineNumber: 351,
                                     columnNumber: 19
                                 }, this)
                             }, void 0, false, {
                                 fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                                lineNumber: 345,
+                                lineNumber: 350,
                                 columnNumber: 17
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3123,7 +3409,7 @@ function Home() {
                                                 size: 16
                                             }, void 0, false, {
                                                 fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                                                lineNumber: 368,
+                                                lineNumber: 373,
                                                 columnNumber: 21
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -3131,7 +3417,7 @@ function Home() {
                                                 children: "Undo"
                                             }, void 0, false, {
                                                 fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                                                lineNumber: 369,
+                                                lineNumber: 374,
                                                 columnNumber: 21
                                             }, this),
                                             swipeHistory.length > 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -3143,13 +3429,13 @@ function Home() {
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                                                lineNumber: 371,
+                                                lineNumber: 376,
                                                 columnNumber: 23
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                                        lineNumber: 362,
+                                        lineNumber: 367,
                                         columnNumber: 19
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3163,14 +3449,14 @@ function Home() {
                                                         children: "←"
                                                     }, void 0, false, {
                                                         fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                                                        lineNumber: 380,
+                                                        lineNumber: 385,
                                                         columnNumber: 23
                                                     }, this),
                                                     "Reject"
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                                                lineNumber: 379,
+                                                lineNumber: 384,
                                                 columnNumber: 21
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -3181,7 +3467,7 @@ function Home() {
                                                         children: "↑"
                                                     }, void 0, false, {
                                                         fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                                                        lineNumber: 384,
+                                                        lineNumber: 389,
                                                         columnNumber: 23
                                                     }, this),
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -3189,13 +3475,13 @@ function Home() {
                                                         children: "Super"
                                                     }, void 0, false, {
                                                         fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                                                        lineNumber: 385,
+                                                        lineNumber: 390,
                                                         columnNumber: 23
                                                     }, this)
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                                                lineNumber: 383,
+                                                lineNumber: 388,
                                                 columnNumber: 21
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -3206,14 +3492,14 @@ function Home() {
                                                         children: "→"
                                                     }, void 0, false, {
                                                         fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                                                        lineNumber: 388,
+                                                        lineNumber: 393,
                                                         columnNumber: 23
                                                     }, this),
                                                     "Approve"
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                                                lineNumber: 387,
+                                                lineNumber: 392,
                                                 columnNumber: 21
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -3224,26 +3510,26 @@ function Home() {
                                                         children: "Z"
                                                     }, void 0, false, {
                                                         fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                                                        lineNumber: 392,
+                                                        lineNumber: 397,
                                                         columnNumber: 23
                                                     }, this),
                                                     "Undo"
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                                                lineNumber: 391,
+                                                lineNumber: 396,
                                                 columnNumber: 21
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                                        lineNumber: 378,
+                                        lineNumber: 383,
                                         columnNumber: 19
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                                lineNumber: 360,
+                                lineNumber: 365,
                                 columnNumber: 17
                             }, this)
                         ]
@@ -3265,12 +3551,12 @@ function Home() {
                                     children: "🎉"
                                 }, void 0, false, {
                                     fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                                    lineNumber: 405,
+                                    lineNumber: 410,
                                     columnNumber: 19
                                 }, this)
                             }, void 0, false, {
                                 fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                                lineNumber: 404,
+                                lineNumber: 409,
                                 columnNumber: 17
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("h2", {
@@ -3278,7 +3564,7 @@ function Home() {
                                 children: "All caught up!"
                             }, void 0, false, {
                                 fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                                lineNumber: 407,
+                                lineNumber: 412,
                                 columnNumber: 17
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -3286,7 +3572,7 @@ function Home() {
                                 children: "No more pending leads to review. Run the scraper to find more!"
                             }, void 0, false, {
                                 fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                                lineNumber: 410,
+                                lineNumber: 415,
                                 columnNumber: 17
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -3295,16 +3581,16 @@ function Home() {
                                 children: "Check for new leads"
                             }, void 0, false, {
                                 fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                                lineNumber: 413,
+                                lineNumber: 418,
                                 columnNumber: 17
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                        lineNumber: 399,
+                        lineNumber: 404,
                         columnNumber: 15
                     }, this)
-                }, void 0, false) : // List mode for approved/rejected leads
+                }, void 0, false) : // List mode for approved/rejected/superliked/contacted leads
                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$framer$2d$motion$2f$dist$2f$es$2f$render$2f$components$2f$motion$2f$proxy$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["motion"].div, {
                     initial: {
                         opacity: 0
@@ -3316,28 +3602,35 @@ function Home() {
                     children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$src$2f$components$2f$LeadsList$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["LeadsList"], {
                         leads: leads,
                         onRestore: handleRestore,
-                        showRestore: true,
+                        showRestore: currentFilter !== "contacted",
                         onBack: ()=>setCurrentFilter("pending"),
-                        title: `${currentFilter.charAt(0).toUpperCase() + currentFilter.slice(1)} Leads`
+                        title: `${currentFilter.charAt(0).toUpperCase() + currentFilter.slice(1)} Leads`,
+                        showContactCheckbox: currentFilter === "approved" || currentFilter === "superliked" || currentFilter === "contacted",
+                        onLeadUpdate: ()=>{
+                            fetchStats();
+                            if (currentFilter === "contacted") {
+                                fetchLeads();
+                            }
+                        }
                     }, void 0, false, {
                         fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                        lineNumber: 429,
+                        lineNumber: 434,
                         columnNumber: 13
                     }, this)
                 }, void 0, false, {
                     fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                    lineNumber: 424,
+                    lineNumber: 429,
                     columnNumber: 11
                 }, this)
             }, void 0, false, {
                 fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-                lineNumber: 326,
+                lineNumber: 331,
                 columnNumber: 7
             }, this)
         ]
     }, void 0, true, {
         fileName: "[project]/Desktop/redditscraper/frontend/src/app/page.tsx",
-        lineNumber: 270,
+        lineNumber: 275,
         columnNumber: 5
     }, this);
 }

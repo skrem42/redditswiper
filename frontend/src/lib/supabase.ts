@@ -34,6 +34,8 @@ export interface RedditLead {
   extracted_links: string[];
   bio: string | null;
   status: "pending" | "approved" | "rejected" | "superliked" | "contacted";
+  contacted_at: string | null;
+  notes: string | null;
   created_at: string;
   updated_at: string;
   reddit_posts?: RedditPost[];
@@ -66,6 +68,7 @@ export interface Stats {
   approved_leads: number;
   rejected_leads: number;
   superliked_leads: number;
+  contacted_leads: number;
 }
 
 // API functions
@@ -137,7 +140,7 @@ export async function updateLeadStatus(
 export async function getStats(): Promise<Stats> {
   const { data: leads } = await supabase
     .from("reddit_leads")
-    .select("id, status");
+    .select("id, status, contacted_at");
 
   const { count: postsCount } = await supabase
     .from("reddit_posts")
@@ -157,6 +160,7 @@ export async function getStats(): Promise<Stats> {
     approved_leads: leadsData.filter((l) => l.status === "approved").length,
     rejected_leads: leadsData.filter((l) => l.status === "rejected").length,
     superliked_leads: leadsData.filter((l) => l.status === "superliked").length,
+    contacted_leads: leadsData.filter((l) => l.contacted_at !== null).length,
   };
 }
 
@@ -431,5 +435,91 @@ export async function addKeywordAndScrape(keyword: string): Promise<{
   const job = await queueScrapeJob(keyword, savedKeyword.id, 1000);
 
   return { keyword: savedKeyword, job };
+}
+
+// =============================================================================
+// CRM FUNCTIONS - CONTACT TRACKING
+// =============================================================================
+
+export async function markLeadContacted(
+  leadId: string,
+  notes?: string
+): Promise<boolean> {
+  const updateData: Record<string, unknown> = {
+    contacted_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+  
+  if (notes !== undefined) {
+    updateData.notes = notes;
+  }
+
+  const { error } = await supabase
+    .from("reddit_leads")
+    .update(updateData)
+    .eq("id", leadId);
+
+  if (error) {
+    console.error("Error marking lead as contacted:", error);
+    return false;
+  }
+
+  return true;
+}
+
+export async function unmarkLeadContacted(leadId: string): Promise<boolean> {
+  const { error } = await supabase
+    .from("reddit_leads")
+    .update({
+      contacted_at: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", leadId);
+
+  if (error) {
+    console.error("Error unmarking lead as contacted:", error);
+    return false;
+  }
+
+  return true;
+}
+
+export async function updateLeadNotes(
+  leadId: string,
+  notes: string
+): Promise<boolean> {
+  const { error } = await supabase
+    .from("reddit_leads")
+    .update({
+      notes,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", leadId);
+
+  if (error) {
+    console.error("Error updating lead notes:", error);
+    return false;
+  }
+
+  return true;
+}
+
+export async function getContactedLeads(
+  limit = 50,
+  offset = 0
+): Promise<RedditLead[]> {
+  const { data, error } = await supabase
+    .from("reddit_leads")
+    .select("*, reddit_posts(*)")
+    .not("contacted_at", "is", null)
+    .order("contacted_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+
+  if (error) {
+    console.error("Error fetching contacted leads:", error);
+    return [];
+  }
+
+  return data || [];
 }
 

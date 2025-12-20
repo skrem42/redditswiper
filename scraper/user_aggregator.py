@@ -33,7 +33,7 @@ class UserAggregator:
     async def fetch_user_profiles(self, usernames: list[str], fetch_posts: bool = True) -> dict[str, dict]:
         """
         Fetch profile data and recent posts for multiple users.
-        Returns dict mapping username -> profile data (with posts).
+        Returns dict mapping username -> profile data (with posts and discovered_subs).
         """
         profiles = {}
         total = len(usernames)
@@ -44,9 +44,10 @@ class UserAggregator:
             if profile:
                 # Also fetch recent posts from user profile for better metrics
                 if fetch_posts:
-                    user_posts = await self.reddit.get_user_posts(username, limit=25)
+                    user_posts, discovered_subs = await self.reddit.get_user_posts(username, limit=25)
                     profile["user_posts"] = user_posts
-                    print(f"    -> Found {len(user_posts)} posts from profile")
+                    profile["discovered_subs"] = discovered_subs  # Subreddits user posts in
+                    print(f"    -> Found {len(user_posts)} posts from profile, {len(discovered_subs)} subs")
                 profiles[username] = profile
         
         return profiles
@@ -155,8 +156,9 @@ class UserAggregator:
                 "posting_frequency": posting_frequency,
                 "extracted_links": extracted_links,
             }
-            # Remove user_posts from lead_data (it's used for calculation, not storage)
+            # Remove internal fields from lead_data (used for calculation, not storage)
             lead_data.pop("user_posts", None)
+            lead_data.pop("discovered_subs", None)
             
             # Save lead to database
             saved_lead = await self.supabase.upsert_lead(lead_data)

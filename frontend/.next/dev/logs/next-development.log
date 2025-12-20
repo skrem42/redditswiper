@@ -1,39 +1,100 @@
-[00:00:01.157] Server  LOG     ✓ Ready in 874ms
-[00:00:06.591] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[00:01:13.635] Browser ERROR   Error fetching leads: {"code":"","details":"TypeError: Failed to fetch\n    at n (chrome-extension://hoklmmgfnpapgjgcpechhaamimifchmp/frame_ant/frame_ant.js:2:15571)\n    at window.fetch (chrome-extension://hoklmmgfnpapgjgcpechhaamimifchmp/frame_ant/frame_ant.js:2:15723)\n    at http://localhost:3000/_next/static/chunks/d7b92_b8abfa74._.js:10331:23\n    at http://localhost:3000/_next/static/chunks/d7b92_b8abfa74._.js:10345:16\n    at async getPendingLeads (http://localhost:3000/_next/static/chunks/Desktop_redditscraper_frontend_src_e4f3830a._.js:56:29)\n    at async Home.useCallback[fetchLeads] (http://localhost:3000/_next/static/chunks/Desktop_redditscraper_frontend_src_e4f3830a._.js:2852:28)","hint":"","message":"TypeError: Failed to fetch"}
-[00:01:13.635] Browser ERROR   Error fetching leads: {"code":"","details":"TypeError: Failed to fetch\n    at n (chrome-extension://hoklmmgfnpapgjgcpechhaamimifchmp/frame_ant/frame_ant.js:2:15571)\n    at window.fetch (chrome-extension://hoklmmgfnpapgjgcpechhaamimifchmp/frame_ant/frame_ant.js:2:15723)\n    at http://localhost:3000/_next/static/chunks/d7b92_b8abfa74._.js:10331:23\n    at http://localhost:3000/_next/static/chunks/d7b92_b8abfa74._.js:10345:16\n    at async getPendingLeads (http://localhost:3000/_next/static/chunks/Desktop_redditscraper_frontend_src_e4f3830a._.js:56:29)\n    at async Home.useCallback[fetchLeads] (http://localhost:3000/_next/static/chunks/Desktop_redditscraper_frontend_src_e4f3830a._.js:2852:28)","hint":"","message":"TypeError: Failed to fetch"}
-[00:01:13.635] Browser ERROR   Error fetching subreddits: {"code":"","details":"TypeError: Failed to fetch\n    at n (chrome-extension://hoklmmgfnpapgjgcpechhaamimifchmp/frame_ant/frame_ant.js:2:15571)\n    at window.fetch (chrome-extension://hoklmmgfnpapgjgcpechhaamimifchmp/frame_ant/frame_ant.js:2:15723)\n    at http://localhost:3000/_next/static/chunks/d7b92_b8abfa74._.js:10331:23\n    at http://localhost:3000/_next/static/chunks/d7b92_b8abfa74._.js:10345:16\n    at async getSubreddits (http://localhost:3000/_next/static/chunks/Desktop_redditscraper_frontend_src_e4f3830a._.js:117:29)\n    at async Home.useCallback[fetchSubreddits] (http://localhost:3000/_next/static/chunks/Desktop_redditscraper_frontend_src_e4f3830a._.js:2817:30)","hint":"","message":"TypeError: Failed to fetch"}
-[00:01:13.635] Browser ERROR   Error fetching subreddits: {"code":"","details":"TypeError: Failed to fetch\n    at n (chrome-extension://hoklmmgfnpapgjgcpechhaamimifchmp/frame_ant/frame_ant.js:2:15571)\n    at window.fetch (chrome-extension://hoklmmgfnpapgjgcpechhaamimifchmp/frame_ant/frame_ant.js:2:15723)\n    at http://localhost:3000/_next/static/chunks/d7b92_b8abfa74._.js:10331:23\n    at http://localhost:3000/_next/static/chunks/d7b92_b8abfa74._.js:10345:16\n    at async getSubreddits (http://localhost:3000/_next/static/chunks/Desktop_redditscraper_frontend_src_e4f3830a._.js:117:29)\n    at async Home.useCallback[fetchSubreddits] (http://localhost:3000/_next/static/chunks/Desktop_redditscraper_frontend_src_e4f3830a._.js:2817:30)","hint":"","message":"TypeError: Failed to fetch"}
-[00:01:13.635] Browser ERROR   Error fetching leads: {"code":"","details":"TypeError: Failed to fetch\n    at n (chrome-extension://hoklmmgfnpapgjgcpechhaamimifchmp/frame_ant/frame_ant.js:2:15571)\n    at window.fetch (chrome-extension://hoklmmgfnpapgjgcpechhaamimifchmp/frame_ant/frame_ant.js:2:15723)\n    at http://localhost:3000/_next/static/chunks/d7b92_b8abfa74._.js:10331:23\n    at http://localhost:3000/_next/static/chunks/d7b92_b8abfa74._.js:10345:16\n    at async getLeadsByStatus (http://localhost:3000/_next/static/chunks/Desktop_redditscraper_frontend_src_e4f3830a._.js:66:29)\n    at async Home.useCallback[fetchLeads] (http://localhost:3000/_next/static/chunks/Desktop_redditscraper_frontend_src_e4f3830a._.js:2854:28)","hint":"","message":"TypeError: Failed to fetch"}
-[00:01:13.635] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[00:01:13.636] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[00:01:13.636] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[00:01:13.636] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[00:01:13.636] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[00:01:13.636] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[00:01:15.634] Browser ERROR   Error fetching leads: {"code":"","details":"TypeError: Failed to fetch\n    at n (chrome-extension://hoklmmgfnpapgjgcpechhaamimifchmp/frame_ant/frame_ant.js:2:15571)\n    at window.fetch (chrome-extension://hoklmmgfnpapgjgcpechhaamimifchmp/frame_ant/frame_ant.js:2:15723)\n    at http://localhost:3000/_next/static/chunks/d7b92_b8abfa74._.js:10331:23\n    at http://localhost:3000/_next/static/chunks/d7b92_b8abfa74._.js:10345:16\n    at async getPendingLeads (http://localhost:3000/_next/static/chunks/Desktop_redditscraper_frontend_src_e4f3830a._.js:56:29)\n    at async Home.useCallback[fetchLeads] (http://localhost:3000/_next/static/chunks/Desktop_redditscraper_frontend_src_e4f3830a._.js:2852:28)","hint":"","message":"TypeError: Failed to fetch"}
-[00:01:15.634] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[00:01:15.634] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[00:01:15.634] Browser ERROR   Error fetching leads: {"code":"","details":"TypeError: Failed to fetch\n    at n (chrome-extension://hoklmmgfnpapgjgcpechhaamimifchmp/frame_ant/frame_ant.js:2:15571)\n    at window.fetch (chrome-extension://hoklmmgfnpapgjgcpechhaamimifchmp/frame_ant/frame_ant.js:2:15723)\n    at http://localhost:3000/_next/static/chunks/d7b92_b8abfa74._.js:10331:23\n    at http://localhost:3000/_next/static/chunks/d7b92_b8abfa74._.js:10345:16\n    at async getPendingLeads (http://localhost:3000/_next/static/chunks/Desktop_redditscraper_frontend_src_e4f3830a._.js:56:29)\n    at async Home.useCallback[fetchLeads] (http://localhost:3000/_next/static/chunks/Desktop_redditscraper_frontend_src_e4f3830a._.js:2852:28)","hint":"","message":"TypeError: Failed to fetch"}
-[00:01:15.634] Browser ERROR   Error fetching leads: {"code":"","details":"TypeError: Failed to fetch\n    at n (chrome-extension://hoklmmgfnpapgjgcpechhaamimifchmp/frame_ant/frame_ant.js:2:15571)\n    at window.fetch (chrome-extension://hoklmmgfnpapgjgcpechhaamimifchmp/frame_ant/frame_ant.js:2:15723)\n    at http://localhost:3000/_next/static/chunks/d7b92_b8abfa74._.js:10331:23\n    at http://localhost:3000/_next/static/chunks/d7b92_b8abfa74._.js:10345:16\n    at async getLeadsByStatus (http://localhost:3000/_next/static/chunks/Desktop_redditscraper_frontend_src_e4f3830a._.js:66:29)\n    at async Home.useCallback[fetchLeads] (http://localhost:3000/_next/static/chunks/Desktop_redditscraper_frontend_src_e4f3830a._.js:2854:28)","hint":"","message":"TypeError: Failed to fetch"}
-[00:01:15.634] Browser ERROR   Error fetching subreddits: {"code":"","details":"TypeError: Failed to fetch\n    at n (chrome-extension://hoklmmgfnpapgjgcpechhaamimifchmp/frame_ant/frame_ant.js:2:15571)\n    at window.fetch (chrome-extension://hoklmmgfnpapgjgcpechhaamimifchmp/frame_ant/frame_ant.js:2:15723)\n    at http://localhost:3000/_next/static/chunks/d7b92_b8abfa74._.js:10331:23\n    at http://localhost:3000/_next/static/chunks/d7b92_b8abfa74._.js:10345:16\n    at async getSubreddits (http://localhost:3000/_next/static/chunks/Desktop_redditscraper_frontend_src_e4f3830a._.js:117:29)\n    at async Home.useCallback[fetchSubreddits] (http://localhost:3000/_next/static/chunks/Desktop_redditscraper_frontend_src_e4f3830a._.js:2817:30)","hint":"","message":"TypeError: Failed to fetch"}
-[00:01:15.634] Browser ERROR   Error fetching leads: {"code":"","details":"TypeError: Failed to fetch\n    at n (chrome-extension://hoklmmgfnpapgjgcpechhaamimifchmp/frame_ant/frame_ant.js:2:15571)\n    at window.fetch (chrome-extension://hoklmmgfnpapgjgcpechhaamimifchmp/frame_ant/frame_ant.js:2:15723)\n    at http://localhost:3000/_next/static/chunks/d7b92_b8abfa74._.js:10331:23\n    at http://localhost:3000/_next/static/chunks/d7b92_b8abfa74._.js:10345:16\n    at async getLeadsByStatus (http://localhost:3000/_next/static/chunks/Desktop_redditscraper_frontend_src_e4f3830a._.js:66:29)\n    at async Home.useCallback[fetchLeads] (http://localhost:3000/_next/static/chunks/Desktop_redditscraper_frontend_src_e4f3830a._.js:2854:28)","hint":"","message":"TypeError: Failed to fetch"}
-[00:01:15.634] Browser ERROR   Error fetching leads: {"code":"","details":"TypeError: Failed to fetch\n    at n (chrome-extension://hoklmmgfnpapgjgcpechhaamimifchmp/frame_ant/frame_ant.js:2:15571)\n    at window.fetch (chrome-extension://hoklmmgfnpapgjgcpechhaamimifchmp/frame_ant/frame_ant.js:2:15723)\n    at http://localhost:3000/_next/static/chunks/d7b92_b8abfa74._.js:10331:23\n    at http://localhost:3000/_next/static/chunks/d7b92_b8abfa74._.js:10345:16\n    at async getLeadsByStatus (http://localhost:3000/_next/static/chunks/Desktop_redditscraper_frontend_src_e4f3830a._.js:66:29)\n    at async Home.useCallback[fetchLeads] (http://localhost:3000/_next/static/chunks/Desktop_redditscraper_frontend_src_e4f3830a._.js:2854:28)","hint":"","message":"TypeError: Failed to fetch"}
-[00:01:15.634] Browser ERROR   Error fetching subreddits: {"code":"","details":"TypeError: Failed to fetch\n    at n (chrome-extension://hoklmmgfnpapgjgcpechhaamimifchmp/frame_ant/frame_ant.js:2:15571)\n    at window.fetch (chrome-extension://hoklmmgfnpapgjgcpechhaamimifchmp/frame_ant/frame_ant.js:2:15723)\n    at http://localhost:3000/_next/static/chunks/d7b92_b8abfa74._.js:10331:23\n    at http://localhost:3000/_next/static/chunks/d7b92_b8abfa74._.js:10345:16\n    at async getSubreddits (http://localhost:3000/_next/static/chunks/Desktop_redditscraper_frontend_src_e4f3830a._.js:117:29)\n    at async Home.useCallback[fetchSubreddits] (http://localhost:3000/_next/static/chunks/Desktop_redditscraper_frontend_src_e4f3830a._.js:2817:30)","hint":"","message":"TypeError: Failed to fetch"}
-[00:01:15.634] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[00:01:15.634] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[00:01:15.634] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[00:01:15.634] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[00:01:15.634] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[00:01:15.634] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[00:01:15.634] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[00:01:15.634] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[00:01:15.634] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[00:01:15.634] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[00:01:15.634] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[00:01:15.634] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[00:01:15.634] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[00:01:15.634] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[00:01:15.634] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[00:01:15.634] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
-[00:01:27.977] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:00:01.140] Server  LOG     ✓ Ready in 852ms
+[00:00:12.258] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[03:28:07.247] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[03:28:08.140] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[03:36:45.746] Server  LOG     ✓ Compiled in 14ms
+[03:36:46.618] Browser WARN    GoTrueClient@sb-jmchmbwhnmlednaycxqh-auth-token:1 (2.89.0) 2025-12-20T16:48:33.436Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key.
+[03:37:04.037] Server  LOG     ✓ Compiled in 52ms
+[03:37:04.619] Browser WARN    GoTrueClient@sb-jmchmbwhnmlednaycxqh-auth-token:2 (2.89.0) 2025-12-20T16:48:51.725Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key.
+[03:37:26.386] Server  LOG     ✓ Compiled in 1541ms
+[03:39:36.994] Server  LOG     ✓ Compiled in 215ms
+[03:39:55.430] Server  LOG     ✓ Compiled in 66ms
+[03:40:01.318] Browser WARN    Unexpected import of module [project]/Desktop/redditscraper/frontend/src/lib/supabase.ts [app-client] (ecmascript, async loader) from module [project]/Desktop/redditscraper/frontend/src/app/page.tsx [app-client] (ecmascript), which was deleted by an HMR update
+[03:40:01.318] Browser WARN    Unexpected import of module [project]/Desktop/redditscraper/frontend/src/lib/supabase.ts [app-client] (ecmascript) from module [project]/Desktop/redditscraper/frontend/src/app/page.tsx [app-client] (ecmascript), which was deleted by an HMR update
+[03:40:04.305] Server  LOG     ✓ Compiled in 38ms
+[03:40:19.154] Server  LOG     ✓ Compiled in 288ms
+[03:40:32.673] Server  LOG     ✓ Compiled in 78ms
+[03:40:33.090] Browser WARN    Unexpected import of module [project]/Desktop/redditscraper/frontend/src/lib/supabase.ts [app-client] (ecmascript, async loader) from module [project]/Desktop/redditscraper/frontend/src/app/page.tsx [app-client] (ecmascript), which was deleted by an HMR update
+[03:40:33.090] Browser WARN    Unexpected import of module [project]/Desktop/redditscraper/frontend/src/lib/supabase.ts [app-client] (ecmascript) from module [project]/Desktop/redditscraper/frontend/src/app/page.tsx [app-client] (ecmascript), which was deleted by an HMR update
+[03:41:31.639] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[03:43:00.639] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.640] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.640] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.640] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.640] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.640] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.640] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.640] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.641] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.641] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.641] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.641] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.641] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.641] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.641] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.641] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.641] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.641] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.641] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.641] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.641] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.641] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.641] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.641] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.642] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.643] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.646] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.646] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.646] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.646] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.646] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.646] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.646] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.646] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.646] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.646] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.646] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.646] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.646] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.646] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.646] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:43:00.646] Browser ERROR   unhandledRejection: TypeError: Failed to fetch

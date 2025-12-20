@@ -69,6 +69,39 @@ if _env_filters:
 else:
     SUBREDDIT_NAME_FILTERS = DEFAULT_SUBREDDIT_FILTERS
 
+# =============================================================================
+# PROXY CONFIGURATION
+# =============================================================================
+# Single rotating proxy with IP rotation API
+# Format: host:port:user:pass
+# =============================================================================
+PROXY_HOST = os.getenv("PROXY_HOST", "afs1.proxi.es")
+PROXY_PORT = os.getenv("PROXY_PORT", "2043")
+PROXY_USER = os.getenv("PROXY_USER", "proxidize-fw4Zh")
+PROXY_PASS = os.getenv("PROXY_PASS", "HTllc")
+
+# Construct proxy URL
+if PROXY_HOST and PROXY_PORT and PROXY_USER and PROXY_PASS:
+    PROXY_URL = f"http://{PROXY_USER}:{PROXY_PASS}@{PROXY_HOST}:{PROXY_PORT}"
+else:
+    PROXY_URL = os.getenv("PROXY_URL", "")
+
+# Rotation API URL - called when rate limited to get a new IP
+PROXY_ROTATION_URL = os.getenv(
+    "PROXY_ROTATION_URL", 
+    "https://api.proxidize.com/api/v1/modem-token-command/rotate-modem-ip/36ecef9633264bb408b82f8822a70f48/"
+)
+
+# Rate limit wait time after rotating IP (seconds)
+RATE_LIMIT_WAIT_SECONDS = int(os.getenv("RATE_LIMIT_WAIT_SECONDS", "10"))
+
+# Legacy: comma-separated proxy list (for multiple static proxies)
+_proxy_str = os.getenv("PROXIES", "")
+PROXIES = [p.strip() for p in _proxy_str.split(",") if p.strip()] if _proxy_str else []
+
+# Crawler settings
+CRAWLER_MIN_SUBSCRIBERS = int(os.getenv("CRAWLER_MIN_SUBSCRIBERS", "1000"))  # Skip tiny subs
+
 # Link patterns to extract (OnlyFans, Linktree, etc.)
 LINK_PATTERNS = [
     r'onlyfans\.com/[\w\-\.]+',

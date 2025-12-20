@@ -9,6 +9,7 @@ Usage:
     python main.py --stats      # Show scraping statistics
     python main.py --jobs       # Process pending jobs from the queue (frontend-triggered)
     python main.py --watch      # Watch for new jobs and process continuously
+    python main.py --crawl      # Run as continuous crawler (discovers subs via user cross-posts)
     
     # Custom keywords:
     python main.py --keywords "fitness,gym,workout"
@@ -268,6 +269,32 @@ Examples:
         action="store_true",
         help="Watch for new jobs and process them continuously"
     )
+    parser.add_argument(
+        "--crawl",
+        action="store_true",
+        help="Run as continuous crawler (discovers new NSFW subs via user cross-posts)"
+    )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=1,
+        help="Number of crawler workers to run in parallel (default: 1)"
+    )
+    parser.add_argument(
+        "--worker-id",
+        type=int,
+        help="Specific worker ID (for running separate processes)"
+    )
+    parser.add_argument(
+        "--min-subs",
+        type=int,
+        help="Minimum subscribers for subreddits to crawl (default: from config)"
+    )
+    parser.add_argument(
+        "--crawl-stats",
+        action="store_true",
+        help="Show crawler queue statistics"
+    )
     
     args = parser.parse_args()
     
@@ -311,6 +338,64 @@ Examples:
         async with RedditClient() as reddit:
             await process_job_queue(supabase, reddit, once=not args.watch)
             await show_stats(supabase)
+        return
+    
+    # Crawler mode - continuous discovery via user cross-posts
+    if args.crawl:
+        from crawler import SubredditCrawler, seed_queue_from_keywords
+        
+        # Check if queue has any pending items (seed if empty)
+        queue_count = await supabase.get_queue_count(status="pending")
+        if queue_count == 0:
+            print("Crawler queue is empty. Seeding with initial subreddits...")
+            async with RedditClient(worker_id=0) as reddit:
+                await seed_queue_from_keywords(reddit, supabase)
+        
+        num_workers = args.workers
+        
+        if num_workers == 1:
+            # Single worker mode
+            worker_id = args.worker_id or 1
+            async with RedditClient(worker_id=worker_id) as reddit:
+                crawler = SubredditCrawler(
+                    reddit, 
+                    supabase,
+                    worker_id=worker_id,
+                    min_subscribers=args.min_subs,
+                )
+                await crawler.run()
+        else:
+            # Multi-worker mode - run workers concurrently
+            print(f"\n🚀 Starting {num_workers} crawler workers...")
+            
+            async def run_worker(worker_id: int):
+                async with RedditClient(worker_id=worker_id) as reddit:
+                    crawler = SubredditCrawler(
+                        reddit,
+                        supabase,
+                        worker_id=worker_id,
+                        min_subscribers=args.min_subs,
+                    )
+                    await crawler.run()
+            
+            # Run all workers concurrently
+            tasks = [run_worker(i) for i in range(1, num_workers + 1)]
+            await asyncio.gather(*tasks)
+        
+        return
+    
+    # Crawler stats mode
+    if args.crawl_stats:
+        queue_stats = await supabase.get_queue_stats()
+        print("\n" + "=" * 50)
+        print("CRAWLER QUEUE STATISTICS")
+        print("=" * 50)
+        print(f"Total in Queue:    {queue_stats['total']}")
+        print(f"Pending:           {queue_stats['pending']}")
+        print(f"Processing:        {queue_stats['processing']}")
+        print(f"Completed:         {queue_stats['completed']}")
+        print(f"Failed:            {queue_stats['failed']}")
+        print("=" * 50)
         return
     
     async with RedditClient() as reddit:

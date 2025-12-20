@@ -1,6 +1,6 @@
 "use client";
 
-import { Users, CheckCircle, XCircle, Clock, Star } from "lucide-react";
+import { Users, CheckCircle, XCircle, Clock, Star, MessageCircle } from "lucide-react";
 import type { Stats } from "@/lib/supabase";
 
 interface StatsBarProps {
@@ -37,6 +37,15 @@ export function StatsBar({ stats, currentFilter, onFilterChange }: StatsBarProps
       color: "text-success",
       bgColor: "bg-success/10",
       borderColor: "border-success/30",
+    },
+    {
+      id: "contacted",
+      label: "Contacted",
+      count: stats.contacted_leads,
+      icon: MessageCircle,
+      color: "text-blue-500",
+      bgColor: "bg-blue-500/10",
+      borderColor: "border-blue-500/30",
     },
     {
       id: "rejected",

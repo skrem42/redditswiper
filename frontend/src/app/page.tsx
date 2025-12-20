@@ -7,6 +7,7 @@ import {
   getPendingLeads,
   getLeadsByStatus,
   getLeadsBySubreddit,
+  getContactedLeads,
   updateLeadStatus,
   getStats,
   getSubreddits,
@@ -38,6 +39,7 @@ export default function Home() {
     approved_leads: 0,
     rejected_leads: 0,
     superliked_leads: 0,
+    contacted_leads: 0,
   });
   const [currentFilter, setCurrentFilter] = useState("pending");
   const [isLoading, setIsLoading] = useState(true);
@@ -93,6 +95,9 @@ export default function Home() {
         data = await getLeadsBySubreddit(selectedSubreddit.id, currentFilter, 50);
       } else if (currentFilter === "pending") {
         data = await getPendingLeads(50);
+      } else if (currentFilter === "contacted") {
+        // Special filter for contacted leads (across all statuses)
+        data = await getContactedLeads(50);
       } else {
         data = await getLeadsByStatus(currentFilter, 50);
       }
@@ -420,7 +425,7 @@ export default function Home() {
             )}
           </>
         ) : (
-          // List mode for approved/rejected leads
+          // List mode for approved/rejected/superliked/contacted leads
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -429,9 +434,16 @@ export default function Home() {
             <LeadsList
               leads={leads}
               onRestore={handleRestore}
-              showRestore={true}
+              showRestore={currentFilter !== "contacted"}
               onBack={() => setCurrentFilter("pending")}
               title={`${currentFilter.charAt(0).toUpperCase() + currentFilter.slice(1)} Leads`}
+              showContactCheckbox={currentFilter === "approved" || currentFilter === "superliked" || currentFilter === "contacted"}
+              onLeadUpdate={() => {
+                fetchStats();
+                if (currentFilter === "contacted") {
+                  fetchLeads();
+                }
+              }}
             />
           </motion.div>
         )}

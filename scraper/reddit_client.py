@@ -1,8 +1,10 @@
 """
 Async Reddit client using public JSON API endpoints.
+Supports rotating proxy with automatic IP rotation on rate limits.
 """
 import asyncio
 import re
+import random
 from typing import Optional
 from datetime import datetime
 import httpx
@@ -12,13 +14,24 @@ from config import (
     REDDIT_USER_AGENT,
     SCRAPE_DELAY_SECONDS,
     LINK_PATTERNS,
+    PROXY_URL,
+    PROXY_ROTATION_URL,
+    RATE_LIMIT_WAIT_SECONDS,
+    PROXIES,
 )
 
 
 class RedditClient:
-    """Async client for Reddit's public JSON API."""
+    """Async client for Reddit's public JSON API with rotating proxy support."""
 
-    def __init__(self):
+    def __init__(self, proxy: str = None, worker_id: int = None):
+        """
+        Initialize Reddit client.
+        
+        Args:
+            proxy: Specific proxy URL to use (e.g., "http://user:pass@host:port")
+            worker_id: Worker ID for logging (auto-assigned if not provided)
+        """
         self.base_url = REDDIT_BASE_URL
         self.headers = {
             "User-Agent": REDDIT_USER_AGENT,
@@ -27,12 +40,30 @@ class RedditClient:
         self.client: Optional[httpx.AsyncClient] = None
         self.last_request_time = 0
         self.link_patterns = [re.compile(p, re.IGNORECASE) for p in LINK_PATTERNS]
+        
+        # Proxy support - use configured proxy URL by default
+        self.proxy = proxy or PROXY_URL
+        self.worker_id = worker_id or random.randint(1000, 9999)
+        
+        # Fallback to legacy proxy list if no single proxy configured
+        if not self.proxy and PROXIES:
+            self.proxy = random.choice(PROXIES)
+        
+        # Track rate limit rotations
+        self.rotation_count = 0
 
     async def __aenter__(self):
+        # Configure proxy if available
+        transport = None
+        if self.proxy:
+            print(f"[Worker {self.worker_id}] Using rotating proxy: {self.proxy[:40]}...")
+            transport = httpx.AsyncHTTPTransport(proxy=self.proxy)
+        
         self.client = httpx.AsyncClient(
             headers=self.headers,
             timeout=30.0,
             follow_redirects=True,
+            transport=transport,
         )
         return self
 
@@ -48,24 +79,52 @@ class RedditClient:
             await asyncio.sleep(SCRAPE_DELAY_SECONDS - elapsed)
         self.last_request_time = asyncio.get_event_loop().time()
 
+    async def _rotate_ip(self):
+        """Call the proxy rotation API to get a new IP address."""
+        if not PROXY_ROTATION_URL:
+            print(f"[Worker {self.worker_id}] No rotation URL configured, skipping IP rotation")
+            return False
+        
+        try:
+            # Use a separate client without proxy to call the rotation API
+            async with httpx.AsyncClient(timeout=30.0) as rotation_client:
+                print(f"[Worker {self.worker_id}] Rotating proxy IP via API...")
+                response = await rotation_client.get(PROXY_ROTATION_URL)
+                if response.status_code == 200:
+                    self.rotation_count += 1
+                    print(f"[Worker {self.worker_id}] ✓ IP rotated successfully (rotation #{self.rotation_count})")
+                    return True
+                else:
+                    print(f"[Worker {self.worker_id}] ✗ IP rotation failed: {response.status_code}")
+                    return False
+        except Exception as e:
+            print(f"[Worker {self.worker_id}] ✗ IP rotation error: {e}")
+            return False
+
     async def _get_json(self, url: str) -> Optional[dict]:
         """Make a rate-limited GET request and return JSON."""
         await self._rate_limit()
         try:
             response = await self.client.get(url)
             if response.status_code == 429:
-                # Rate limited - wait and retry
-                retry_after = int(response.headers.get("Retry-After", 60))
-                print(f"Rate limited. Waiting {retry_after} seconds...")
-                await asyncio.sleep(retry_after)
+                # Rate limited - rotate IP and retry with reduced wait time
+                print(f"[Worker {self.worker_id}] Rate limited (429). Rotating IP and waiting {RATE_LIMIT_WAIT_SECONDS}s...")
+                await self._rotate_ip()
+                await asyncio.sleep(RATE_LIMIT_WAIT_SECONDS)
                 return await self._get_json(url)
             response.raise_for_status()
             return response.json()
         except httpx.HTTPStatusError as e:
-            print(f"HTTP error for {url}: {e}")
+            if e.response.status_code == 429:
+                # Handle 429 raised as exception
+                print(f"[Worker {self.worker_id}] Rate limited (429 exception). Rotating IP and waiting {RATE_LIMIT_WAIT_SECONDS}s...")
+                await self._rotate_ip()
+                await asyncio.sleep(RATE_LIMIT_WAIT_SECONDS)
+                return await self._get_json(url)
+            print(f"[Worker {self.worker_id}] HTTP error for {url}: {e}")
             return None
         except Exception as e:
-            print(f"Error fetching {url}: {e}")
+            print(f"[Worker {self.worker_id}] Error fetching {url}: {e}")
             return None
 
     async def search_subreddits(self, query: str = "onlyfans", nsfw: bool = True, limit: int = 50) -> list[dict]:
@@ -202,14 +261,20 @@ class RedditClient:
             "extracted_links": extracted_links,
         }
 
-    async def get_user_posts(self, username: str, limit: int = 25) -> list[dict]:
-        """Fetch recent posts from a user's profile."""
+    async def get_user_posts(self, username: str, limit: int = 25) -> tuple[list[dict], set[str]]:
+        """
+        Fetch recent posts from a user's profile.
+        
+        Returns:
+            tuple: (list of posts, set of subreddit names user posts in)
+        """
         posts = []
+        discovered_subs = set()
         url = f"{self.base_url}/user/{username}/submitted.json?limit={limit}&sort=new"
         
         data = await self._get_json(url)
         if not data or "data" not in data:
-            return []
+            return [], set()
         
         children = data["data"].get("children", [])
         
@@ -219,6 +284,11 @@ class RedditClient:
             # Skip non-posts (comments, etc.)
             if child.get("kind") != "t3":
                 continue
+            
+            # Track subreddits user posts in (for crawler discovery)
+            subreddit_name = post_data.get("subreddit", "")
+            if subreddit_name:
+                discovered_subs.add(subreddit_name)
             
             # Extract links from post content
             content = post_data.get("selftext", "") or ""
@@ -235,7 +305,7 @@ class RedditClient:
             
             posts.append({
                 "reddit_post_id": post_data.get("id", ""),
-                "subreddit_name": post_data.get("subreddit", ""),
+                "subreddit_name": subreddit_name,
                 "author": username,
                 "title": title,
                 "content": content,
@@ -252,7 +322,27 @@ class RedditClient:
                 "extracted_links": extracted_links,
             })
         
-        return posts
+        return posts, discovered_subs
+
+    async def get_subreddit_info(self, subreddit: str) -> Optional[dict]:
+        """
+        Fetch subreddit metadata including NSFW status.
+        Used by crawler to determine if a discovered subreddit should be added to queue.
+        """
+        url = f"{self.base_url}/r/{subreddit}/about.json"
+        data = await self._get_json(url)
+        
+        if not data or "data" not in data:
+            return None
+        
+        sub_data = data["data"]
+        return {
+            "name": sub_data.get("display_name", subreddit),
+            "display_name": sub_data.get("display_name_prefixed", f"r/{subreddit}"),
+            "subscribers": sub_data.get("subscribers", 0),
+            "is_nsfw": sub_data.get("over18", False),
+            "description": sub_data.get("public_description", ""),
+        }
 
     def _extract_links(self, text: str) -> list[str]:
         """Extract OnlyFans, Linktree, and other relevant links from text."""
