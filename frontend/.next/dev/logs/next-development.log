@@ -1,0 +1,257 @@
+[00:00:01.231] Server  LOG     ✓ Ready in 909ms
+[00:00:07.943] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:19:36.390] Server  LOG     ✓ Compiled in 614ms
+[00:20:37.287] Server  LOG     ✓ Compiled in 270ms
+[00:21:00.047] Server  LOG     ✓ Compiled in 48ms
+[00:21:00.192] Browser ERROR   ./Desktop/redditscraper/frontend/src/components/LeadsList.tsx:113:4
+Parsing ecmascript source code failed
+  111 |       ))}
+  112 |     </div>
+> 113 |   );
+      |    ^
+  114 | }
+  115 |
+  116 |
+
+Expected '</', got ';'
+
+Import traces:
+  Client Component Browser:
+    ./Desktop/redditscraper/frontend/src/components/LeadsList.tsx [Client Component Browser]
+    ./Desktop/redditscraper/frontend/src/app/page.tsx [Client Component Browser]
+    ./Desktop/redditscraper/frontend/src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./Desktop/redditscraper/frontend/src/components/LeadsList.tsx [Client Component SSR]
+    ./Desktop/redditscraper/frontend/src/app/page.tsx [Client Component SSR]
+    ./Desktop/redditscraper/frontend/src/app/page.tsx [Server Component]
+[00:21:20.387] Server  LOG     ✓ Compiled in 255ms
+[00:21:47.912] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:25:31.426] Server  LOG     ✓ Compiled in 148ms
+[00:25:41.156] Server  LOG     ✓ Compiled in 53ms
+[00:25:47.852] Server  LOG     ✓ Compiled in 64ms
+[00:25:58.709] Server  LOG     ✓ Compiled in 27ms
+[00:26:06.116] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:26:40.232] Server  LOG     ✓ Compiled in 27ms
+[00:27:24.079] Server  LOG     ✓ Compiled in 30ms
+[00:27:31.766] Server  LOG     ✓ Compiled in 19ms
+[00:27:44.887] Server  LOG     ✓ Compiled in 18ms
+[00:27:57.313] Server  LOG     ✓ Compiled in 29ms
+[00:28:03.085] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:33:51.571] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:34:33.346] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:37:28.260] Server  LOG     ✓ Compiled in 250ms
+[00:37:34.576] Server  LOG     ✓ Compiled in 13ms
+[00:37:35.009] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:40:01.626] Server  LOG     ✓ Compiled in 128ms
+[00:40:16.182] Server  LOG     ✓ Compiled in 40ms
+[00:40:31.499] Server  LOG     ✓ Compiled in 1734ms
+[00:40:38.813] Server  LOG     ✓ Compiled in 49ms
+[00:40:47.430] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:45:13.796] Server  LOG     ✓ Compiled in 396ms
+[00:45:46.018] Server  LOG     ✓ Compiled in 223ms
+[00:45:55.300] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:48:19.266] Server  LOG     ✓ Compiled in 33ms
+[00:48:19.433] Browser WARN    GoTrueClient@sb-jmchmbwhnmlednaycxqh-auth-token:1 (2.89.0) 2025-12-19T16:22:09.143Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key.
+[00:48:19.433] Browser WARN    GoTrueClient@sb-jmchmbwhnmlednaycxqh-auth-token:2 (2.89.0) 2025-12-19T16:22:09.178Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key.
+[00:48:19.448] Browser WARN    GoTrueClient@sb-jmchmbwhnmlednaycxqh-auth-token:1 (2.89.0) 2025-12-19T16:22:09.136Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key.
+[00:48:19.448] Browser WARN    GoTrueClient@sb-jmchmbwhnmlednaycxqh-auth-token:2 (2.89.0) 2025-12-19T16:22:09.178Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key.
+[00:48:20.197] Browser WARN    GoTrueClient@sb-jmchmbwhnmlednaycxqh-auth-token:1 (2.89.0) 2025-12-19T16:22:09.138Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key.
+[00:48:20.198] Browser WARN    GoTrueClient@sb-jmchmbwhnmlednaycxqh-auth-token:2 (2.89.0) 2025-12-19T16:22:09.201Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key.
+[00:48:20.199] Browser WARN    GoTrueClient@sb-jmchmbwhnmlednaycxqh-auth-token:1 (2.89.0) 2025-12-19T16:22:09.138Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key.
+[00:48:20.199] Browser WARN    GoTrueClient@sb-jmchmbwhnmlednaycxqh-auth-token:2 (2.89.0) 2025-12-19T16:22:09.188Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key.
+[00:48:35.600] Server  LOG     ✓ Compiled in 48ms
+[00:48:59.380] Server  LOG     ✓ Compiled in 66ms
+[00:48:59.683] Browser ERROR   The final argument passed to %s changed size between renders. The order and size of this array must remain constant.
+
+Previous: %s
+Incoming: %s useEffect [true, , 2] [true, , 2, ]
+[00:48:59.683] Browser ERROR   The final argument passed to %s changed size between renders. The order and size of this array must remain constant.
+
+Previous: %s
+Incoming: %s useEffect [true, , 2] [true, , 2, ]
+[00:48:59.945] Server  LOG     ✓ Compiled in 185ms
+[00:49:00.192] Browser ERROR   The final argument passed to %s changed size between renders. The order and size of this array must remain constant.
+
+Previous: %s
+Incoming: %s useEffect [true, , 2] [true, , 2, ]
+[00:49:00.193] Browser ERROR   The final argument passed to %s changed size between renders. The order and size of this array must remain constant.
+
+Previous: %s
+Incoming: %s useEffect [true, , 2] [true, , 2, ]
+[00:49:21.043] Server  LOG     ✓ Compiled in 264ms
+[00:49:37.336] Server  LOG     ✓ Compiled in 37ms
+[00:50:02.849] Server  LOG     ✓ Compiled in 107ms
+[00:50:17.730] Server  LOG     ✓ Compiled in 76ms
+[00:50:21.697] Browser ERROR   Error updating lead status: {"code":"23514","details":null,"hint":null,"message":"new row for relation \"reddit_leads\" violates check constraint \"reddit_leads_status_check\""}
+[00:50:33.636] Server  LOG     ✓ Compiled in 210ms
+[00:50:53.214] Server  LOG     ✓ Compiled in 92ms
+[00:51:05.760] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:51:29.398] Browser ERROR   Error updating lead status: {"code":"23514","details":null,"hint":null,"message":"new row for relation \"reddit_leads\" violates check constraint \"reddit_leads_status_check\""}
+[00:52:20.738] Browser ERROR   Error creating decision record: {"code":"23514","details":null,"hint":null,"message":"new row for relation \"lead_decisions\" violates check constraint \"lead_decisions_decision_check\""}
+[00:55:28.260] Browser ERROR   Error creating decision record: {"code":"23514","details":null,"hint":null,"message":"new row for relation \"lead_decisions\" violates check constraint \"lead_decisions_decision_check\""}
+[00:55:49.819] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:55:52.279] Browser ERROR   Error creating decision record: {"code":"23514","details":null,"hint":null,"message":"new row for relation \"lead_decisions\" violates check constraint \"lead_decisions_decision_check\""}
+[00:56:42.642] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[01:01:38.349] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[01:06:24.117] Browser ERROR   Error updating lead status: {"code":"","details":"TypeError: Failed to fetch\n    at http://localhost:3000/_next/static/chunks/d7b92_6b2bebea._.js:9844:23\n    at http://localhost:3000/_next/static/chunks/d7b92_6b2bebea._.js:9858:16\n    at async updateLeadStatus (http://localhost:3000/_next/static/chunks/Desktop_redditscraper_frontend_src_93ea9c01._.js:54:36)\n    at async handleSwipe (http://localhost:3000/_next/static/chunks/Desktop_redditscraper_frontend_src_93ea9c01._.js:1733:9)","hint":"","message":"TypeError: Failed to fetch"}
+[01:06:39.332] Browser ERROR   Error updating lead status: {"code":"","details":"TypeError: Failed to fetch\n    at http://localhost:3000/_next/static/chunks/d7b92_6b2bebea._.js:9844:23\n    at http://localhost:3000/_next/static/chunks/d7b92_6b2bebea._.js:9858:16\n    at async updateLeadStatus (http://localhost:3000/_next/static/chunks/Desktop_redditscraper_frontend_src_93ea9c01._.js:54:36)\n    at async handleSwipe (http://localhost:3000/_next/static/chunks/Desktop_redditscraper_frontend_src_93ea9c01._.js:1733:9)","hint":"","message":"TypeError: Failed to fetch"}
+[01:06:46.199] Browser ERROR   Error updating lead status: {"code":"","details":"TypeError: Failed to fetch\n    at http://localhost:3000/_next/static/chunks/d7b92_6b2bebea._.js:9844:23\n    at http://localhost:3000/_next/static/chunks/d7b92_6b2bebea._.js:9858:16\n    at async updateLeadStatus (http://localhost:3000/_next/static/chunks/Desktop_redditscraper_frontend_src_93ea9c01._.js:54:36)\n    at async handleSwipe (http://localhost:3000/_next/static/chunks/Desktop_redditscraper_frontend_src_93ea9c01._.js:1733:9)","hint":"","message":"TypeError: Failed to fetch"}
+[01:06:55.069] Browser ERROR   Error updating lead status: {"code":"","details":"TypeError: Failed to fetch\n    at http://localhost:3000/_next/static/chunks/d7b92_6b2bebea._.js:9844:23\n    at http://localhost:3000/_next/static/chunks/d7b92_6b2bebea._.js:9858:16\n    at async updateLeadStatus (http://localhost:3000/_next/static/chunks/Desktop_redditscraper_frontend_src_93ea9c01._.js:54:36)\n    at async handleSwipe (http://localhost:3000/_next/static/chunks/Desktop_redditscraper_frontend_src_93ea9c01._.js:1733:9)","hint":"","message":"TypeError: Failed to fetch"}
+[01:07:08.193] Browser ERROR   Error updating lead status: {"code":"","details":"TypeError: Failed to fetch\n    at http://localhost:3000/_next/static/chunks/d7b92_6b2bebea._.js:9844:23\n    at http://localhost:3000/_next/static/chunks/d7b92_6b2bebea._.js:9858:16\n    at async updateLeadStatus (http://localhost:3000/_next/static/chunks/Desktop_redditscraper_frontend_src_93ea9c01._.js:54:36)\n    at async handleSwipe (http://localhost:3000/_next/static/chunks/Desktop_redditscraper_frontend_src_93ea9c01._.js:1733:9)","hint":"","message":"TypeError: Failed to fetch"}
+[01:07:15.754] Browser ERROR   Error updating lead status: {"code":"","details":"TypeError: Failed to fetch\n    at http://localhost:3000/_next/static/chunks/d7b92_6b2bebea._.js:9844:23\n    at http://localhost:3000/_next/static/chunks/d7b92_6b2bebea._.js:9858:16\n    at async updateLeadStatus (http://localhost:3000/_next/static/chunks/Desktop_redditscraper_frontend_src_93ea9c01._.js:54:36)\n    at async handleSwipe (http://localhost:3000/_next/static/chunks/Desktop_redditscraper_frontend_src_93ea9c01._.js:1733:9)","hint":"","message":"TypeError: Failed to fetch"}
+[01:07:16.504] Browser ERROR   Error updating lead status: {"code":"","details":"TypeError: Failed to fetch\n    at http://localhost:3000/_next/static/chunks/d7b92_6b2bebea._.js:9844:23\n    at http://localhost:3000/_next/static/chunks/d7b92_6b2bebea._.js:9858:16\n    at async updateLeadStatus (http://localhost:3000/_next/static/chunks/Desktop_redditscraper_frontend_src_93ea9c01._.js:54:36)\n    at async handleSwipe (http://localhost:3000/_next/static/chunks/Desktop_redditscraper_frontend_src_93ea9c01._.js:1733:9)","hint":"","message":"TypeError: Failed to fetch"}
+[01:07:17.154] Browser ERROR   Error updating lead status: {"code":"","details":"TypeError: Failed to fetch\n    at http://localhost:3000/_next/static/chunks/d7b92_6b2bebea._.js:9844:23\n    at http://localhost:3000/_next/static/chunks/d7b92_6b2bebea._.js:9858:16\n    at async updateLeadStatus (http://localhost:3000/_next/static/chunks/Desktop_redditscraper_frontend_src_93ea9c01._.js:54:36)\n    at async handleSwipe (http://localhost:3000/_next/static/chunks/Desktop_redditscraper_frontend_src_93ea9c01._.js:1733:9)","hint":"","message":"TypeError: Failed to fetch"}
+[02:40:11.655] Server  LOG     ✓ Compiled in 64ms
+[02:40:28.598] Server  LOG     ✓ Compiled in 139ms
+[02:57:22.546] Server  LOG     ✓ Compiled in 173ms
+[02:57:22.635] Browser WARN    GoTrueClient@sb-jmchmbwhnmlednaycxqh-auth-token:1 (2.89.0) 2025-12-19T18:31:12.284Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key.
+[02:57:22.699] Browser WARN    GoTrueClient@sb-jmchmbwhnmlednaycxqh-auth-token:1 (2.89.0) 2025-12-19T18:31:12.321Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key.
+[02:57:23.000] Browser WARN    GoTrueClient@sb-jmchmbwhnmlednaycxqh-auth-token:3 (2.89.0) 2025-12-19T18:31:12.293Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key.
+[02:57:50.608] Server  LOG     ✓ Compiled in 108ms
+[02:58:01.862] Server  LOG     ✓ Compiled in 107ms
+[02:58:04.413] Browser WARN    Unexpected import of module [project]/Desktop/redditscraper/frontend/src/lib/supabase.ts [app-client] (ecmascript, async loader) from module [project]/Desktop/redditscraper/frontend/src/app/page.tsx [app-client] (ecmascript), which was deleted by an HMR update
+[02:58:04.413] Browser WARN    Unexpected import of module [project]/Desktop/redditscraper/frontend/src/lib/supabase.ts [app-client] (ecmascript) from module [project]/Desktop/redditscraper/frontend/src/app/page.tsx [app-client] (ecmascript), which was deleted by an HMR update
+[02:58:24.420] Server  LOG     ✓ Compiled in 189ms
+[02:58:29.300] Server  LOG     ✓ Compiled in 22ms
+[02:58:29.385] Browser ERROR   The final argument passed to %s changed size between renders. The order and size of this array must remain constant.
+
+Previous: %s
+Incoming: %s useEffect [pending, async ()=>{
+            setIsLoading(true);
+            try {
+                let data;
+                if (selectedSubreddit) {
+                    // Filter by subreddit
+                    data = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$src$2f$lib$2f$supabase$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["getLeadsBySubreddit"])(selectedSubreddit.id, currentFilter, 50);
+                } else if (currentFilter === "pending") {
+                    data = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$src$2f$lib$2f$supabase$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["getPendingLeads"])(50);
+                } else {
+                    data = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$src$2f$lib$2f$supabase$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["getLeadsByStatus"])(currentFilter, 50);
+                }
+                setLeads(data);
+                setCurrentIndex(0);
+            } catch (error) {
+                console.error("Error fetching leads:", error);
+            } finally{
+                setIsLoading(false);
+            }
+        }] [pending, , async ()=>{
+            setIsLoading(true);
+            try {
+                let data;
+                if (selectedSubreddit) {
+                    // Filter by subreddit
+                    data = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$src$2f$lib$2f$supabase$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["getLeadsBySubreddit"])(selectedSubreddit.id, currentFilter, 50);
+                } else if (currentFilter === "pending") {
+                    data = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$src$2f$lib$2f$supabase$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["getPendingLeads"])(50);
+                } else {
+                    data = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$src$2f$lib$2f$supabase$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["getLeadsByStatus"])(currentFilter, 50);
+                }
+                setLeads(data);
+                setCurrentIndex(0);
+            } catch (error) {
+                console.error("Error fetching leads:", error);
+            } finally{
+                setIsLoading(false);
+            }
+        }]
+[02:58:29.393] Browser ERROR   The final argument passed to %s changed size between renders. The order and size of this array must remain constant.
+
+Previous: %s
+Incoming: %s useEffect [pending, async ()=>{
+            setIsLoading(true);
+            try {
+                let data;
+                if (selectedSubreddit) {
+                    // Filter by subreddit
+                    data = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$src$2f$lib$2f$supabase$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["getLeadsBySubreddit"])(selectedSubreddit.id, currentFilter, 50);
+                } else if (currentFilter === "pending") {
+                    data = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$src$2f$lib$2f$supabase$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["getPendingLeads"])(50);
+                } else {
+                    data = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$src$2f$lib$2f$supabase$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["getLeadsByStatus"])(currentFilter, 50);
+                }
+                setLeads(data);
+                setCurrentIndex(0);
+            } catch (error) {
+                console.error("Error fetching leads:", error);
+            } finally{
+                setIsLoading(false);
+            }
+        }] [pending, , async ()=>{
+            setIsLoading(true);
+            try {
+                let data;
+                if (selectedSubreddit) {
+                    // Filter by subreddit
+                    data = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$src$2f$lib$2f$supabase$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["getLeadsBySubreddit"])(selectedSubreddit.id, currentFilter, 50);
+                } else if (currentFilter === "pending") {
+                    data = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$src$2f$lib$2f$supabase$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["getPendingLeads"])(50);
+                } else {
+                    data = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$src$2f$lib$2f$supabase$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["getLeadsByStatus"])(currentFilter, 50);
+                }
+                setLeads(data);
+                setCurrentIndex(0);
+            } catch (error) {
+                console.error("Error fetching leads:", error);
+            } finally{
+                setIsLoading(false);
+            }
+        }]
+[02:58:29.629] Browser WARN    Unexpected import of module [project]/Desktop/redditscraper/frontend/src/lib/supabase.ts [app-client] (ecmascript, async loader) from module [project]/Desktop/redditscraper/frontend/src/app/page.tsx [app-client] (ecmascript), which was deleted by an HMR update
+[02:58:29.629] Browser WARN    Unexpected import of module [project]/Desktop/redditscraper/frontend/src/lib/supabase.ts [app-client] (ecmascript) from module [project]/Desktop/redditscraper/frontend/src/app/page.tsx [app-client] (ecmascript), which was deleted by an HMR update
+[02:58:29.670] Browser WARN    Unexpected import of module [project]/Desktop/redditscraper/frontend/src/lib/supabase.ts [app-client] (ecmascript, async loader) from module [project]/Desktop/redditscraper/frontend/src/app/page.tsx [app-client] (ecmascript), which was deleted by an HMR update
+[02:58:29.670] Browser WARN    Unexpected import of module [project]/Desktop/redditscraper/frontend/src/lib/supabase.ts [app-client] (ecmascript) from module [project]/Desktop/redditscraper/frontend/src/app/page.tsx [app-client] (ecmascript), which was deleted by an HMR update
+[02:58:30.000] Browser ERROR   The final argument passed to %s changed size between renders. The order and size of this array must remain constant.
+
+Previous: %s
+Incoming: %s useEffect [pending, async ()=>{
+            setIsLoading(true);
+            try {
+                let data;
+                if (selectedSubreddit) {
+                    // Filter by subreddit
+                    data = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$src$2f$lib$2f$supabase$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["getLeadsBySubreddit"])(selectedSubreddit.id, currentFilter, 50);
+                } else if (currentFilter === "pending") {
+                    data = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$src$2f$lib$2f$supabase$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["getPendingLeads"])(50);
+                } else {
+                    data = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$src$2f$lib$2f$supabase$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["getLeadsByStatus"])(currentFilter, 50);
+                }
+                setLeads(data);
+                setCurrentIndex(0);
+            } catch (error) {
+                console.error("Error fetching leads:", error);
+            } finally{
+                setIsLoading(false);
+            }
+        }] [pending, , async ()=>{
+            setIsLoading(true);
+            try {
+                let data;
+                if (selectedSubreddit) {
+                    // Filter by subreddit
+                    data = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$src$2f$lib$2f$supabase$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["getLeadsBySubreddit"])(selectedSubreddit.id, currentFilter, 50);
+                } else if (currentFilter === "pending") {
+                    data = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$src$2f$lib$2f$supabase$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["getPendingLeads"])(50);
+                } else {
+                    data = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$src$2f$lib$2f$supabase$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["getLeadsByStatus"])(currentFilter, 50);
+                }
+                setLeads(data);
+                setCurrentIndex(0);
+            } catch (error) {
+                console.error("Error fetching leads:", error);
+            } finally{
+                setIsLoading(false);
+            }
+        }]
+[02:58:30.000] Browser WARN    Unexpected import of module [project]/Desktop/redditscraper/frontend/src/lib/supabase.ts [app-client] (ecmascript, async loader) from module [project]/Desktop/redditscraper/frontend/src/app/page.tsx [app-client] (ecmascript), which was deleted by an HMR update
+[02:58:30.000] Browser WARN    Unexpected import of module [project]/Desktop/redditscraper/frontend/src/lib/supabase.ts [app-client] (ecmascript) from module [project]/Desktop/redditscraper/frontend/src/app/page.tsx [app-client] (ecmascript), which was deleted by an HMR update
+[02:58:44.233] Server  LOG     ✓ Compiled in 137ms
+[02:58:53.930] Server  LOG     ✓ Compiled in 60ms
+[03:01:20.884] Server  LOG     ✓ Compiled in 44ms
+[03:01:20.970] Browser WARN    GoTrueClient@sb-jmchmbwhnmlednaycxqh-auth-token:2 (2.89.0) 2025-12-19T18:35:10.612Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key.
+[03:01:20.974] Browser WARN    GoTrueClient@sb-jmchmbwhnmlednaycxqh-auth-token:2 (2.89.0) 2025-12-19T18:35:10.620Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key.
+[03:01:20.999] Browser WARN    GoTrueClient@sb-jmchmbwhnmlednaycxqh-auth-token:4 (2.89.0) 2025-12-19T18:35:10.635Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key.
+[03:02:24.064] Server  LOG     ✓ Compiled in 112ms
+[03:04:14.258] Server  LOG     ✓ Compiled in 52ms
+[03:04:24.127] Server  LOG     ✓ Compiled in 128ms

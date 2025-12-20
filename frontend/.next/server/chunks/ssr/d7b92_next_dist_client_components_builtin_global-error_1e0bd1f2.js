@@ -1,0 +1,3 @@
+module.exports=[96268,(a,b,c)=>{let{createClientModuleProxy:d}=a.r(38787);a.n(d("[project]/Desktop/redditscraper/frontend/node_modules/next/dist/client/components/builtin/global-error.js <module evaluation>"))},41771,(a,b,c)=>{let{createClientModuleProxy:d}=a.r(38787);a.n(d("[project]/Desktop/redditscraper/frontend/node_modules/next/dist/client/components/builtin/global-error.js"))},83514,a=>{"use strict";a.i(96268);var b=a.i(41771);a.n(b)}];
+
+//# sourceMappingURL=d7b92_next_dist_client_components_builtin_global-error_1e0bd1f2.js.map
