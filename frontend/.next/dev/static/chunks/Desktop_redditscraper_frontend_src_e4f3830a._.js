@@ -367,7 +367,8 @@ var _s = __turbopack_context__.k.signature();
 function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
     _s();
     const [exitDirection, setExitDirection] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(null);
-    const [lightboxIndex, setLightboxIndex] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(null);
+    const [carouselIndex, setCarouselIndex] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(0);
+    const [lightboxOpen, setLightboxOpen] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false);
     const x = (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$framer$2d$motion$2f$dist$2f$es$2f$value$2f$use$2d$motion$2d$value$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useMotionValue"])(0);
     const rotate = (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$framer$2d$motion$2f$dist$2f$es$2f$value$2f$use$2d$transform$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useTransform"])(x, [
         -300,
@@ -577,24 +578,32 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
             if (!isActive) return;
             const handleKeyDown = {
                 "SwipeCard.useEffect.handleKeyDown": (e)=>{
-                    // Lightbox navigation
-                    if (lightboxIndex !== null) {
+                    // Lightbox mode - arrow keys navigate images, escape closes
+                    if (lightboxOpen) {
                         if (e.key === "Escape") {
-                            setLightboxIndex(null);
-                        } else if (e.key === "ArrowLeft" && lightboxIndex > 0) {
-                            setLightboxIndex(lightboxIndex - 1);
-                        } else if (e.key === "ArrowRight" && lightboxIndex < mediaUrls.length - 1) {
-                            setLightboxIndex(lightboxIndex + 1);
+                            setLightboxOpen(false);
+                        } else if (e.key === "ArrowLeft" && carouselIndex > 0) {
+                            setCarouselIndex(carouselIndex - 1);
+                        } else if (e.key === "ArrowRight" && carouselIndex < mediaUrls.length - 1) {
+                            setCarouselIndex(carouselIndex + 1);
                         }
                         return;
                     }
-                    // Card swipe controls
-                    if (e.key === "ArrowLeft" || e.key === "a") {
+                    // Card swipe controls - A/D for swipe, arrows for carousel
+                    if (e.key === "a") {
                         handleButtonSwipe("left");
-                    } else if (e.key === "ArrowRight" || e.key === "d") {
+                    } else if (e.key === "d") {
                         handleButtonSwipe("right");
                     } else if (e.key === "ArrowUp" || e.key === "w" || e.key === "s") {
                         handleSuperLike();
+                    } else if (e.key === "ArrowLeft" && mediaUrls.length > 0) {
+                        setCarouselIndex({
+                            "SwipeCard.useEffect.handleKeyDown": (prev)=>Math.max(0, prev - 1)
+                        }["SwipeCard.useEffect.handleKeyDown"]);
+                    } else if (e.key === "ArrowRight" && mediaUrls.length > 0) {
+                        setCarouselIndex({
+                            "SwipeCard.useEffect.handleKeyDown": (prev)=>Math.min(mediaUrls.length - 1, prev + 1)
+                        }["SwipeCard.useEffect.handleKeyDown"]);
                     }
                 }
             }["SwipeCard.useEffect.handleKeyDown"];
@@ -605,7 +614,8 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
         }
     }["SwipeCard.useEffect"], [
         isActive,
-        lightboxIndex,
+        lightboxOpen,
+        carouselIndex,
         mediaUrls.length,
         onSuperLike
     ]);
@@ -683,7 +693,7 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                             children: "NOPE"
                         }, void 0, false, {
                             fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                            lineNumber: 208,
+                            lineNumber: 213,
                             columnNumber: 11
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$framer$2d$motion$2f$dist$2f$es$2f$render$2f$components$2f$motion$2f$proxy$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__["motion"].div, {
@@ -694,89 +704,118 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                             children: "YES!"
                         }, void 0, false, {
                             fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                            lineNumber: 214,
+                            lineNumber: 219,
                             columnNumber: 11
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                            className: "max-h-[80vh] overflow-y-auto",
                             onPointerDownCapture: (e)=>e.stopPropagation(),
                             children: [
-                                mediaUrls.length > 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                    className: "p-2 bg-black/40",
+                                mediaUrls.length > 0 ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                    className: "relative bg-black/40",
                                     children: [
-                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                            className: "grid grid-cols-2 gap-2",
-                                            children: mediaUrls.slice(0, 4).map((url, i)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
-                                                    onClick: ()=>setLightboxIndex(i),
-                                                    className: "relative aspect-[4/5] rounded-xl overflow-hidden bg-muted group cursor-pointer",
-                                                    children: [
-                                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("img", {
-                                                            src: url,
-                                                            alt: `Preview ${i + 1}`,
-                                                            className: "w-full h-full object-cover group-hover:scale-105 transition-transform duration-300",
-                                                            loading: "lazy"
-                                                        }, void 0, false, {
-                                                            fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                            lineNumber: 236,
-                                                            columnNumber: 23
-                                                        }, this),
-                                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                                            className: "absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center",
-                                                            children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                                                className: "text-white/0 group-hover:text-white/90 text-sm font-medium transition-colors",
-                                                                children: "Click to preview"
-                                                            }, void 0, false, {
-                                                                fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                                lineNumber: 243,
-                                                                columnNumber: 25
-                                                            }, this)
-                                                        }, void 0, false, {
-                                                            fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                            lineNumber: 242,
-                                                            columnNumber: 23
-                                                        }, this)
-                                                    ]
-                                                }, i, true, {
+                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                            onClick: ()=>setLightboxOpen(true),
+                                            className: "w-full aspect-[16/9] overflow-hidden cursor-pointer group",
+                                            children: [
+                                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("img", {
+                                                    src: mediaUrls[carouselIndex],
+                                                    alt: `Preview ${carouselIndex + 1}`,
+                                                    className: "w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                                }, void 0, false, {
                                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                    lineNumber: 231,
+                                                    lineNumber: 236,
+                                                    columnNumber: 19
+                                                }, this),
+                                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                    className: "absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors"
+                                                }, void 0, false, {
+                                                    fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
+                                                    lineNumber: 241,
+                                                    columnNumber: 19
+                                                }, this)
+                                            ]
+                                        }, void 0, true, {
+                                            fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
+                                            lineNumber: 232,
+                                            columnNumber: 17
+                                        }, this),
+                                        carouselIndex > 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                            onClick: ()=>setCarouselIndex(carouselIndex - 1),
+                                            className: "absolute left-2 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/50 hover:bg-black/70 transition-colors",
+                                            children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$chevron$2d$left$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__ChevronLeft$3e$__["ChevronLeft"], {
+                                                size: 20,
+                                                className: "text-white"
+                                            }, void 0, false, {
+                                                fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
+                                                lineNumber: 250,
+                                                columnNumber: 21
+                                            }, this)
+                                        }, void 0, false, {
+                                            fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
+                                            lineNumber: 246,
+                                            columnNumber: 19
+                                        }, this),
+                                        carouselIndex < mediaUrls.length - 1 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                            onClick: ()=>setCarouselIndex(carouselIndex + 1),
+                                            className: "absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/50 hover:bg-black/70 transition-colors",
+                                            children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$chevron$2d$right$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__ChevronRight$3e$__["ChevronRight"], {
+                                                size: 20,
+                                                className: "text-white"
+                                            }, void 0, false, {
+                                                fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
+                                                lineNumber: 258,
+                                                columnNumber: 21
+                                            }, this)
+                                        }, void 0, false, {
+                                            fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
+                                            lineNumber: 254,
+                                            columnNumber: 19
+                                        }, this),
+                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                            className: "absolute bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-1.5",
+                                            children: mediaUrls.map((_, i)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                                    onClick: ()=>setCarouselIndex(i),
+                                                    className: `w-2 h-2 rounded-full transition-all ${i === carouselIndex ? 'bg-white w-4' : 'bg-white/40 hover:bg-white/60'}`
+                                                }, i, false, {
+                                                    fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
+                                                    lineNumber: 265,
                                                     columnNumber: 21
                                                 }, this))
                                         }, void 0, false, {
                                             fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                            lineNumber: 229,
+                                            lineNumber: 263,
                                             columnNumber: 17
                                         }, this),
-                                        mediaUrls.length > 4 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                            className: "text-center text-xs text-muted-foreground mt-2",
+                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                            className: "absolute top-2 right-2 px-2 py-1 rounded-full bg-black/50 text-white text-xs font-medium",
                                             children: [
-                                                "+",
-                                                mediaUrls.length - 4,
-                                                " more images"
+                                                carouselIndex + 1,
+                                                " / ",
+                                                mediaUrls.length
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                            lineNumber: 251,
-                                            columnNumber: 19
+                                            lineNumber: 278,
+                                            columnNumber: 17
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                    lineNumber: 228,
+                                    lineNumber: 230,
                                     columnNumber: 15
-                                }, this),
-                                mediaUrls.length === 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                    className: "h-32 bg-gradient-to-br from-primary/20 via-accent/20 to-purple-500/20 flex items-center justify-center",
+                                }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                    className: "h-24 bg-gradient-to-br from-primary/20 via-accent/20 to-purple-500/20 flex items-center justify-center",
                                     children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                         className: "text-muted-foreground text-sm",
                                         children: "No media available"
                                     }, void 0, false, {
                                         fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                        lineNumber: 261,
+                                        lineNumber: 284,
                                         columnNumber: 17
                                     }, this)
                                 }, void 0, false, {
                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                    lineNumber: 260,
+                                    lineNumber: 283,
                                     columnNumber: 15
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -790,7 +829,7 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                                     className: "text-emerald-400 mb-1"
                                                 }, void 0, false, {
                                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                    lineNumber: 268,
+                                                    lineNumber: 291,
                                                     columnNumber: 17
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -798,7 +837,7 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                                     children: lead.karma.toLocaleString()
                                                 }, void 0, false, {
                                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                    lineNumber: 269,
+                                                    lineNumber: 292,
                                                     columnNumber: 17
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -806,13 +845,13 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                                     children: "Karma"
                                                 }, void 0, false, {
                                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                    lineNumber: 270,
+                                                    lineNumber: 293,
                                                     columnNumber: 17
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                            lineNumber: 267,
+                                            lineNumber: 290,
                                             columnNumber: 15
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -823,7 +862,7 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                                     className: "text-sky-400 mb-1"
                                                 }, void 0, false, {
                                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                    lineNumber: 273,
+                                                    lineNumber: 296,
                                                     columnNumber: 17
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -831,7 +870,7 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                                     children: stats.postsPerDay
                                                 }, void 0, false, {
                                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                    lineNumber: 274,
+                                                    lineNumber: 297,
                                                     columnNumber: 17
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -839,13 +878,13 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                                     children: "Posts/Day"
                                                 }, void 0, false, {
                                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                    lineNumber: 275,
+                                                    lineNumber: 298,
                                                     columnNumber: 17
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                            lineNumber: 272,
+                                            lineNumber: 295,
                                             columnNumber: 15
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -856,7 +895,7 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                                     className: "text-rose-400 mb-1"
                                                 }, void 0, false, {
                                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                    lineNumber: 278,
+                                                    lineNumber: 301,
                                                     columnNumber: 17
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -864,7 +903,7 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                                     children: stats.avgUpvotes
                                                 }, void 0, false, {
                                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                    lineNumber: 279,
+                                                    lineNumber: 302,
                                                     columnNumber: 17
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -872,13 +911,13 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                                     children: "Avg Upvotes"
                                                 }, void 0, false, {
                                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                    lineNumber: 280,
+                                                    lineNumber: 303,
                                                     columnNumber: 17
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                            lineNumber: 277,
+                                            lineNumber: 300,
                                             columnNumber: 15
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -889,7 +928,7 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                                     className: "text-amber-400 mb-1"
                                                 }, void 0, false, {
                                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                    lineNumber: 283,
+                                                    lineNumber: 306,
                                                     columnNumber: 17
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -897,7 +936,7 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                                     children: stats.accountAge
                                                 }, void 0, false, {
                                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                    lineNumber: 284,
+                                                    lineNumber: 307,
                                                     columnNumber: 17
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -905,19 +944,19 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                                     children: "Age"
                                                 }, void 0, false, {
                                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                    lineNumber: 285,
+                                                    lineNumber: 308,
                                                     columnNumber: 17
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                            lineNumber: 282,
+                                            lineNumber: 305,
                                             columnNumber: 15
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                    lineNumber: 266,
+                                    lineNumber: 289,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -931,7 +970,7 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                                     children: "🔥"
                                                 }, void 0, false, {
                                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                    lineNumber: 298,
+                                                    lineNumber: 321,
                                                     columnNumber: 17
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -939,13 +978,13 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                                     children: linkAnalysis.hasOF ? linkAnalysis.bioIndicatesOF ? 'OF Likely' : 'OF Found' : 'No OF'
                                                 }, void 0, false, {
                                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                    lineNumber: 299,
+                                                    lineNumber: 322,
                                                     columnNumber: 17
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                            lineNumber: 291,
+                                            lineNumber: 314,
                                             columnNumber: 15
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -956,7 +995,7 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                                     children: linkAnalysis.hasTracking ? '🏷️' : linkAnalysis.hasOF ? '✓' : '—'
                                                 }, void 0, false, {
                                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                    lineNumber: 313,
+                                                    lineNumber: 336,
                                                     columnNumber: 17
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -964,13 +1003,13 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                                     children: linkAnalysis.hasTracking ? 'Agency?' : linkAnalysis.hasOF ? 'No Track' : '—'
                                                 }, void 0, false, {
                                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                    lineNumber: 314,
+                                                    lineNumber: 337,
                                                     columnNumber: 17
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                            lineNumber: 308,
+                                            lineNumber: 331,
                                             columnNumber: 15
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -981,7 +1020,7 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                                     children: "🌳"
                                                 }, void 0, false, {
                                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                    lineNumber: 322,
+                                                    lineNumber: 345,
                                                     columnNumber: 17
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -989,13 +1028,13 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                                     children: linkAnalysis.hasLinktree ? 'Linktree' : 'No Link'
                                                 }, void 0, false, {
                                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                    lineNumber: 323,
+                                                    lineNumber: 346,
                                                     columnNumber: 17
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                            lineNumber: 321,
+                                            lineNumber: 344,
                                             columnNumber: 15
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1006,7 +1045,7 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                                     children: "📱"
                                                 }, void 0, false, {
                                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                    lineNumber: 329,
+                                                    lineNumber: 352,
                                                     columnNumber: 17
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1014,19 +1053,19 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                                     children: linkAnalysis.hasSocials ? `${linkAnalysis.socialLinks.length} Social` : 'None'
                                                 }, void 0, false, {
                                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                    lineNumber: 330,
+                                                    lineNumber: 353,
                                                     columnNumber: 17
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                            lineNumber: 328,
+                                            lineNumber: 351,
                                             columnNumber: 15
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                    lineNumber: 290,
+                                    lineNumber: 313,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1041,14 +1080,14 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                                     className: "w-12 h-12 rounded-full object-cover border-2 border-primary/30"
                                                 }, void 0, false, {
                                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                    lineNumber: 341,
+                                                    lineNumber: 364,
                                                     columnNumber: 19
                                                 }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                                                     className: "w-12 h-12 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-xl font-bold text-white",
                                                     children: lead.reddit_username.charAt(0).toUpperCase()
                                                 }, void 0, false, {
                                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                    lineNumber: 347,
+                                                    lineNumber: 370,
                                                     columnNumber: 19
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1065,7 +1104,7 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                                                     ]
                                                                 }, void 0, true, {
                                                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                                    lineNumber: 353,
+                                                                    lineNumber: 376,
                                                                     columnNumber: 21
                                                                 }, this),
                                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("a", {
@@ -1077,18 +1116,18 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                                                         size: 14
                                                                     }, void 0, false, {
                                                                         fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                                        lineNumber: 362,
+                                                                        lineNumber: 385,
                                                                         columnNumber: 23
                                                                     }, this)
                                                                 }, void 0, false, {
                                                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                                    lineNumber: 356,
+                                                                    lineNumber: 379,
                                                                     columnNumber: 21
                                                                 }, this)
                                                             ]
                                                         }, void 0, true, {
                                                             fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                            lineNumber: 352,
+                                                            lineNumber: 375,
                                                             columnNumber: 19
                                                         }, this),
                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1099,19 +1138,19 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                                             ]
                                                         }, void 0, true, {
                                                             fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                            lineNumber: 365,
+                                                            lineNumber: 388,
                                                             columnNumber: 19
                                                         }, this)
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                    lineNumber: 351,
+                                                    lineNumber: 374,
                                                     columnNumber: 17
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                            lineNumber: 339,
+                                            lineNumber: 362,
                                             columnNumber: 15
                                         }, this),
                                         lead.bio && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -1119,7 +1158,7 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                             children: lead.bio
                                         }, void 0, false, {
                                             fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                            lineNumber: 373,
+                                            lineNumber: 396,
                                             columnNumber: 17
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1137,13 +1176,13 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                                             size: 14
                                                         }, void 0, false, {
                                                             fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                            lineNumber: 393,
+                                                            lineNumber: 416,
                                                             columnNumber: 21
                                                         }, this)
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                    lineNumber: 382,
+                                                    lineNumber: 405,
                                                     columnNumber: 19
                                                 }, this) : // No OF link found - show button to check their bio/profile for links
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("a", {
@@ -1157,13 +1196,13 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                                             size: 14
                                                         }, void 0, false, {
                                                             fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                            lineNumber: 404,
+                                                            lineNumber: 427,
                                                             columnNumber: 21
                                                         }, this)
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                    lineNumber: 397,
+                                                    lineNumber: 420,
                                                     columnNumber: 19
                                                 }, this),
                                                 linkAnalysis.linktreeLinks.length > 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("a", {
@@ -1177,13 +1216,13 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                                             size: 12
                                                         }, void 0, false, {
                                                             fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                            lineNumber: 417,
+                                                            lineNumber: 440,
                                                             columnNumber: 21
                                                         }, this)
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                    lineNumber: 410,
+                                                    lineNumber: 433,
                                                     columnNumber: 19
                                                 }, this),
                                                 linkAnalysis.ofLinks.length > 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("a", {
@@ -1197,31 +1236,31 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                                             size: 12
                                                         }, void 0, false, {
                                                             fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                            lineNumber: 430,
+                                                            lineNumber: 453,
                                                             columnNumber: 21
                                                         }, this)
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                                    lineNumber: 423,
+                                                    lineNumber: 446,
                                                     columnNumber: 19
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                            lineNumber: 379,
+                                            lineNumber: 402,
                                             columnNumber: 15
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                    lineNumber: 337,
+                                    lineNumber: 360,
                                     columnNumber: 13
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                            lineNumber: 222,
+                            lineNumber: 227,
                             columnNumber: 11
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1237,12 +1276,12 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                         strokeWidth: 3
                                     }, void 0, false, {
                                         fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                        lineNumber: 447,
+                                        lineNumber: 470,
                                         columnNumber: 15
                                     }, this)
                                 }, void 0, false, {
                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                    lineNumber: 442,
+                                    lineNumber: 465,
                                     columnNumber: 13
                                 }, this),
                                 onSuperLike && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -1255,12 +1294,12 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                         fill: "currentColor"
                                     }, void 0, false, {
                                         fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                        lineNumber: 457,
+                                        lineNumber: 480,
                                         columnNumber: 17
                                     }, this)
                                 }, void 0, false, {
                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                    lineNumber: 452,
+                                    lineNumber: 475,
                                     columnNumber: 15
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -1273,33 +1312,33 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                         fill: "currentColor"
                                     }, void 0, false, {
                                         fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                        lineNumber: 466,
+                                        lineNumber: 489,
                                         columnNumber: 15
                                     }, this)
                                 }, void 0, false, {
                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                    lineNumber: 461,
+                                    lineNumber: 484,
                                     columnNumber: 13
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                            lineNumber: 438,
+                            lineNumber: 461,
                             columnNumber: 11
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                    lineNumber: 198,
+                    lineNumber: 203,
                     columnNumber: 9
                 }, this)
             }, void 0, false, {
                 fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                lineNumber: 191,
+                lineNumber: 196,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$framer$2d$motion$2f$dist$2f$es$2f$components$2f$AnimatePresence$2f$index$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__["AnimatePresence"], {
-                children: lightboxIndex !== null && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$framer$2d$motion$2f$dist$2f$es$2f$render$2f$components$2f$motion$2f$proxy$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__["motion"].div, {
+                children: lightboxOpen && mediaUrls.length > 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$framer$2d$motion$2f$dist$2f$es$2f$render$2f$components$2f$motion$2f$proxy$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__["motion"].div, {
                     initial: {
                         opacity: 0
                     },
@@ -1310,12 +1349,12 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                         opacity: 0
                     },
                     className: "fixed inset-0 z-50 bg-black/95 flex items-center justify-center",
-                    onClick: ()=>setLightboxIndex(null),
+                    onClick: ()=>setLightboxOpen(false),
                     children: [
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
                             onClick: (e)=>{
                                 e.stopPropagation();
-                                setLightboxIndex(null);
+                                setLightboxOpen(false);
                             },
                             className: "absolute top-4 right-4 z-10 p-3 rounded-full bg-white/20 hover:bg-white/30 transition-colors",
                             children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$x$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__X$3e$__["X"], {
@@ -1323,30 +1362,30 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                 className: "text-white"
                             }, void 0, false, {
                                 fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                lineNumber: 490,
+                                lineNumber: 513,
                                 columnNumber: 15
                             }, this)
                         }, void 0, false, {
                             fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                            lineNumber: 483,
+                            lineNumber: 506,
                             columnNumber: 13
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                             className: "absolute top-4 left-4 text-white/80 text-sm font-medium bg-black/40 px-3 py-1 rounded-full",
                             children: [
-                                lightboxIndex + 1,
+                                carouselIndex + 1,
                                 " / ",
                                 mediaUrls.length
                             ]
                         }, void 0, true, {
                             fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                            lineNumber: 494,
+                            lineNumber: 517,
                             columnNumber: 13
                         }, this),
-                        lightboxIndex > 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                        carouselIndex > 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
                             onClick: (e)=>{
                                 e.stopPropagation();
-                                setLightboxIndex(lightboxIndex - 1);
+                                setCarouselIndex(carouselIndex - 1);
                             },
                             className: "absolute left-4 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white/20 hover:bg-white/30 transition-colors",
                             children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$chevron$2d$left$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__ChevronLeft$3e$__["ChevronLeft"], {
@@ -1354,18 +1393,18 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                 className: "text-white"
                             }, void 0, false, {
                                 fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                lineNumber: 507,
+                                lineNumber: 530,
                                 columnNumber: 17
                             }, this)
                         }, void 0, false, {
                             fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                            lineNumber: 500,
+                            lineNumber: 523,
                             columnNumber: 15
                         }, this),
-                        lightboxIndex < mediaUrls.length - 1 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                        carouselIndex < mediaUrls.length - 1 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
                             onClick: (e)=>{
                                 e.stopPropagation();
-                                setLightboxIndex(lightboxIndex + 1);
+                                setCarouselIndex(carouselIndex + 1);
                             },
                             className: "absolute right-4 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white/20 hover:bg-white/30 transition-colors",
                             children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$chevron$2d$right$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__ChevronRight$3e$__["ChevronRight"], {
@@ -1373,12 +1412,12 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                 className: "text-white"
                             }, void 0, false, {
                                 fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                lineNumber: 518,
+                                lineNumber: 541,
                                 columnNumber: 17
                             }, this)
                         }, void 0, false, {
                             fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                            lineNumber: 511,
+                            lineNumber: 534,
                             columnNumber: 15
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$framer$2d$motion$2f$dist$2f$es$2f$render$2f$components$2f$motion$2f$proxy$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__["motion"].img, {
@@ -1394,13 +1433,13 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                 scale: 0.9,
                                 opacity: 0
                             },
-                            src: mediaUrls[lightboxIndex],
-                            alt: `Full preview ${lightboxIndex + 1}`,
+                            src: mediaUrls[carouselIndex],
+                            alt: `Full preview ${carouselIndex + 1}`,
                             className: "max-h-[90vh] max-w-[90vw] object-contain rounded-lg",
                             onClick: (e)=>e.stopPropagation()
-                        }, lightboxIndex, false, {
+                        }, carouselIndex, false, {
                             fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                            lineNumber: 523,
+                            lineNumber: 546,
                             columnNumber: 13
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1410,37 +1449,37 @@ function SwipeCard({ lead, onSwipe, onSuperLike, isActive }) {
                                     children: "← → Navigate"
                                 }, void 0, false, {
                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                    lineNumber: 536,
+                                    lineNumber: 559,
                                     columnNumber: 15
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                     children: "ESC Close"
                                 }, void 0, false, {
                                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                                    lineNumber: 537,
+                                    lineNumber: 560,
                                     columnNumber: 15
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                            lineNumber: 535,
+                            lineNumber: 558,
                             columnNumber: 13
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                    lineNumber: 475,
+                    lineNumber: 498,
                     columnNumber: 11
                 }, this)
             }, void 0, false, {
                 fileName: "[project]/Desktop/redditscraper/frontend/src/components/SwipeCard.tsx",
-                lineNumber: 473,
+                lineNumber: 496,
                 columnNumber: 7
             }, this)
         ]
     }, void 0, true);
 }
-_s(SwipeCard, "XeI4PqcnNlH7a8iPRPP0AYCTWg8=", false, function() {
+_s(SwipeCard, "Zf6armXMZYK1sF4+gj+uxxhjwSI=", false, function() {
     return [
         __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$framer$2d$motion$2f$dist$2f$es$2f$value$2f$use$2d$motion$2d$value$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useMotionValue"],
         __TURBOPACK__imported__module__$5b$project$5d2f$Desktop$2f$redditscraper$2f$frontend$2f$node_modules$2f$framer$2d$motion$2f$dist$2f$es$2f$value$2f$use$2d$transform$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useTransform"],

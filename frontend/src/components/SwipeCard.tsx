@@ -14,7 +14,8 @@ interface SwipeCardProps {
 
 export function SwipeCard({ lead, onSwipe, onSuperLike, isActive }: SwipeCardProps) {
   const [exitDirection, setExitDirection] = useState<"left" | "right" | "up" | null>(null);
-  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [carouselIndex, setCarouselIndex] = useState(0);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
   const x = useMotionValue(0);
   const rotate = useTransform(x, [-300, 0, 300], [-15, 0, 15]);
   const opacity = useTransform(x, [-300, -100, 0, 100, 300], [0.5, 1, 1, 1, 0.5]);
@@ -154,31 +155,35 @@ export function SwipeCard({ lead, onSwipe, onSuperLike, isActive }: SwipeCardPro
     if (!isActive) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Lightbox navigation
-      if (lightboxIndex !== null) {
+      // Lightbox mode - arrow keys navigate images, escape closes
+      if (lightboxOpen) {
         if (e.key === "Escape") {
-          setLightboxIndex(null);
-        } else if (e.key === "ArrowLeft" && lightboxIndex > 0) {
-          setLightboxIndex(lightboxIndex - 1);
-        } else if (e.key === "ArrowRight" && lightboxIndex < mediaUrls.length - 1) {
-          setLightboxIndex(lightboxIndex + 1);
+          setLightboxOpen(false);
+        } else if (e.key === "ArrowLeft" && carouselIndex > 0) {
+          setCarouselIndex(carouselIndex - 1);
+        } else if (e.key === "ArrowRight" && carouselIndex < mediaUrls.length - 1) {
+          setCarouselIndex(carouselIndex + 1);
         }
         return;
       }
       
-      // Card swipe controls
-      if (e.key === "ArrowLeft" || e.key === "a") {
+      // Card swipe controls - A/D for swipe, arrows for carousel
+      if (e.key === "a") {
         handleButtonSwipe("left");
-      } else if (e.key === "ArrowRight" || e.key === "d") {
+      } else if (e.key === "d") {
         handleButtonSwipe("right");
       } else if (e.key === "ArrowUp" || e.key === "w" || e.key === "s") {
         handleSuperLike();
+      } else if (e.key === "ArrowLeft" && mediaUrls.length > 0) {
+        setCarouselIndex(prev => Math.max(0, prev - 1));
+      } else if (e.key === "ArrowRight" && mediaUrls.length > 0) {
+        setCarouselIndex(prev => Math.min(mediaUrls.length - 1, prev + 1));
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isActive, lightboxIndex, mediaUrls.length, onSuperLike]);
+  }, [isActive, lightboxOpen, carouselIndex, mediaUrls.length, onSuperLike]);
 
   const exitVariants = {
     left: { x: -500, rotate: -30, opacity: 0, transition: { duration: 0.4, ease: "easeOut" } },
@@ -218,46 +223,64 @@ export function SwipeCard({ lead, onSwipe, onSuperLike, isActive }: SwipeCardPro
             YES!
           </motion.div>
 
-          {/* Scrollable content area */}
-          <div 
-            className="max-h-[80vh] overflow-y-auto"
-            onPointerDownCapture={(e) => e.stopPropagation()}
-          >
-            {/* Large Media Grid - 2 columns for bigger thumbnails */}
-            {mediaUrls.length > 0 && (
-              <div className="p-2 bg-black/40">
-                <div className="grid grid-cols-2 gap-2">
-                  {mediaUrls.slice(0, 4).map((url, i) => (
+          {/* Content area - no scrolling needed now */}
+          <div onPointerDownCapture={(e) => e.stopPropagation()}>
+            {/* Compact Media Carousel */}
+            {mediaUrls.length > 0 ? (
+              <div className="relative bg-black/40">
+                {/* Main carousel image - click to open lightbox */}
+                <button
+                  onClick={() => setLightboxOpen(true)}
+                  className="w-full aspect-[16/9] overflow-hidden cursor-pointer group"
+                >
+                  <img
+                    src={mediaUrls[carouselIndex]}
+                    alt={`Preview ${carouselIndex + 1}`}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  />
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
+                </button>
+
+                {/* Carousel navigation arrows */}
+                {carouselIndex > 0 && (
+                  <button
+                    onClick={() => setCarouselIndex(carouselIndex - 1)}
+                    className="absolute left-2 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/50 hover:bg-black/70 transition-colors"
+                  >
+                    <ChevronLeft size={20} className="text-white" />
+                  </button>
+                )}
+                {carouselIndex < mediaUrls.length - 1 && (
+                  <button
+                    onClick={() => setCarouselIndex(carouselIndex + 1)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/50 hover:bg-black/70 transition-colors"
+                  >
+                    <ChevronRight size={20} className="text-white" />
+                  </button>
+                )}
+
+                {/* Dot indicators */}
+                <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-1.5">
+                  {mediaUrls.map((_, i) => (
                     <button
                       key={i}
-                      onClick={() => setLightboxIndex(i)}
-                      className="relative aspect-[4/5] rounded-xl overflow-hidden bg-muted group cursor-pointer"
-                    >
-                      <img
-                        src={url}
-                        alt={`Preview ${i + 1}`}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        loading="lazy"
-                      />
-                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
-                        <span className="text-white/0 group-hover:text-white/90 text-sm font-medium transition-colors">
-                          Click to preview
-                        </span>
-                      </div>
-                    </button>
+                      onClick={() => setCarouselIndex(i)}
+                      className={`w-2 h-2 rounded-full transition-all ${
+                        i === carouselIndex 
+                          ? 'bg-white w-4' 
+                          : 'bg-white/40 hover:bg-white/60'
+                      }`}
+                    />
                   ))}
                 </div>
-                {mediaUrls.length > 4 && (
-                  <div className="text-center text-xs text-muted-foreground mt-2">
-                    +{mediaUrls.length - 4} more images
-                  </div>
-                )}
-              </div>
-            )}
 
-            {/* No media fallback */}
-            {mediaUrls.length === 0 && (
-              <div className="h-32 bg-gradient-to-br from-primary/20 via-accent/20 to-purple-500/20 flex items-center justify-center">
+                {/* Counter badge */}
+                <div className="absolute top-2 right-2 px-2 py-1 rounded-full bg-black/50 text-white text-xs font-medium">
+                  {carouselIndex + 1} / {mediaUrls.length}
+                </div>
+              </div>
+            ) : (
+              <div className="h-24 bg-gradient-to-br from-primary/20 via-accent/20 to-purple-500/20 flex items-center justify-center">
                 <span className="text-muted-foreground text-sm">No media available</span>
               </div>
             )}
@@ -469,21 +492,21 @@ export function SwipeCard({ lead, onSwipe, onSuperLike, isActive }: SwipeCardPro
         </motion.div>
       </motion.div>
 
-      {/* Lightbox for image preview */}
+      {/* Lightbox for full-size image preview */}
       <AnimatePresence>
-        {lightboxIndex !== null && (
+        {lightboxOpen && mediaUrls.length > 0 && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center"
-            onClick={() => setLightboxIndex(null)}
+            onClick={() => setLightboxOpen(false)}
           >
             {/* Close button */}
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                setLightboxIndex(null);
+                setLightboxOpen(false);
               }}
               className="absolute top-4 right-4 z-10 p-3 rounded-full bg-white/20 hover:bg-white/30 transition-colors"
             >
@@ -492,26 +515,26 @@ export function SwipeCard({ lead, onSwipe, onSuperLike, isActive }: SwipeCardPro
 
             {/* Image counter */}
             <div className="absolute top-4 left-4 text-white/80 text-sm font-medium bg-black/40 px-3 py-1 rounded-full">
-              {lightboxIndex + 1} / {mediaUrls.length}
+              {carouselIndex + 1} / {mediaUrls.length}
             </div>
 
             {/* Navigation arrows */}
-            {lightboxIndex > 0 && (
+            {carouselIndex > 0 && (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  setLightboxIndex(lightboxIndex - 1);
+                  setCarouselIndex(carouselIndex - 1);
                 }}
                 className="absolute left-4 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white/20 hover:bg-white/30 transition-colors"
               >
                 <ChevronLeft size={32} className="text-white" />
               </button>
             )}
-            {lightboxIndex < mediaUrls.length - 1 && (
+            {carouselIndex < mediaUrls.length - 1 && (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  setLightboxIndex(lightboxIndex + 1);
+                  setCarouselIndex(carouselIndex + 1);
                 }}
                 className="absolute right-4 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white/20 hover:bg-white/30 transition-colors"
               >
@@ -521,12 +544,12 @@ export function SwipeCard({ lead, onSwipe, onSuperLike, isActive }: SwipeCardPro
 
             {/* Main image */}
             <motion.img
-              key={lightboxIndex}
+              key={carouselIndex}
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              src={mediaUrls[lightboxIndex]}
-              alt={`Full preview ${lightboxIndex + 1}`}
+              src={mediaUrls[carouselIndex]}
+              alt={`Full preview ${carouselIndex + 1}`}
               className="max-h-[90vh] max-w-[90vw] object-contain rounded-lg"
               onClick={(e) => e.stopPropagation()}
             />

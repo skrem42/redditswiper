@@ -98,3 +98,17 @@
 [03:43:00.646] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
 [03:43:00.646] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
 [03:43:00.646] Browser ERROR   unhandledRejection: TypeError: Failed to fetch
+[03:55:50.018] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[04:01:15.925] Server  LOG     ✓ Compiled in 141ms
+[04:01:16.047] Browser ERROR   uncaughtError: ReferenceError: lightboxIndex is not defined
+[04:01:31.959] Server  WARN    ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+[04:01:32.001] Server  LOG     ✓ Compiled in 31ms
+[04:01:32.684] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[04:01:33.793] Browser ERROR   uncaughtError: ReferenceError: lightboxIndex is not defined
+[04:02:00.636] Server  WARN    ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+[04:02:00.732] Server  LOG     ✓ Compiled in 69ms
+[04:02:00.924] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[04:02:02.054] Browser ERROR   uncaughtError: ReferenceError: lightboxIndex is not defined
+[04:02:25.804] Server  WARN    ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+[04:02:25.827] Server  LOG     ✓ Compiled in 47ms
+[04:02:26.136] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold

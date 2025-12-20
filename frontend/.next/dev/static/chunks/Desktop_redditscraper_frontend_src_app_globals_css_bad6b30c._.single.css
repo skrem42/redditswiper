@@ -324,6 +324,22 @@ img, video {
   top: 100%;
 }
 
+.bottom-2 {
+  bottom: .5rem;
+}
+
+.left-2 {
+  left: .5rem;
+}
+
+.right-2 {
+  right: .5rem;
+}
+
+.top-2 {
+  top: .5rem;
+}
+
 .z-10 {
   z-index: 10;
 }
@@ -412,6 +428,10 @@ img, video {
   aspect-ratio: 4 / 5;
 }
 
+.aspect-\[16\/9\] {
+  aspect-ratio: 16 / 9;
+}
+
 .h-12 {
   height: 3rem;
 }
@@ -442,6 +462,14 @@ img, video {
 
 .h-6 {
   height: 1.5rem;
+}
+
+.h-2 {
+  height: .5rem;
+}
+
+.h-24 {
+  height: 6rem;
 }
 
 .max-h-48 {
@@ -510,6 +538,14 @@ img, video {
 
 .w-6 {
   width: 1.5rem;
+}
+
+.w-2 {
+  width: .5rem;
+}
+
+.w-4 {
+  width: 1rem;
 }
 
 .min-w-0 {
@@ -941,6 +977,19 @@ img, video {
 .bg-blue-500 {
   --tw-bg-opacity: 1;
   background-color: rgb(59 130 246 / var(--tw-bg-opacity, 1));
+}
+
+.bg-black\/50 {
+  background-color: #00000080;
+}
+
+.bg-white {
+  --tw-bg-opacity: 1;
+  background-color: rgb(255 255 255 / var(--tw-bg-opacity, 1));
+}
+
+.bg-white\/40 {
+  background-color: #fff6;
 }
 
 .bg-gradient-to-br {
@@ -1531,6 +1580,14 @@ body {
   background-color: #ffffff4d;
 }
 
+.hover\:bg-black\/70:hover {
+  background-color: #000000b3;
+}
+
+.hover\:bg-white\/60:hover {
+  background-color: #fff9;
+}
+
 .hover\:from-pink-600:hover {
   --tw-gradient-from: #db2777 var(--tw-gradient-from-position);
   --tw-gradient-to: #db277700 var(--tw-gradient-to-position);
@@ -1589,6 +1646,10 @@ body {
 
 .group:hover .group-hover\:bg-black\/20 {
   background-color: #0003;
+}
+
+.group:hover .group-hover\:bg-black\/10 {
+  background-color: #0000001a;
 }
 
 .group:hover .group-hover\:text-white\/90 {
