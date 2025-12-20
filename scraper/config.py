@@ -8,8 +8,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Supabase Configuration
-SUPABASE_URL = os.getenv("SUPABASE_URL", "https://jmchmbwhnmlednaycxqh.supabase.co")
+# Supabase Configuration (set via environment variables)
+SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY", "")
 
 # Reddit API Configuration
@@ -70,15 +70,16 @@ else:
     SUBREDDIT_NAME_FILTERS = DEFAULT_SUBREDDIT_FILTERS
 
 # =============================================================================
-# PROXY CONFIGURATION
+# PROXY CONFIGURATION (set via environment variables)
 # =============================================================================
 # Single rotating proxy with IP rotation API
-# Format: host:port:user:pass
+# Set these in your .env file or Railway/Vercel environment variables:
+#   PROXY_HOST, PROXY_PORT, PROXY_USER, PROXY_PASS, PROXY_ROTATION_URL
 # =============================================================================
-PROXY_HOST = os.getenv("PROXY_HOST", "afs1.proxi.es")
-PROXY_PORT = os.getenv("PROXY_PORT", "2043")
-PROXY_USER = os.getenv("PROXY_USER", "proxidize-fw4Zh")
-PROXY_PASS = os.getenv("PROXY_PASS", "HTllc")
+PROXY_HOST = os.getenv("PROXY_HOST", "")
+PROXY_PORT = os.getenv("PROXY_PORT", "")
+PROXY_USER = os.getenv("PROXY_USER", "")
+PROXY_PASS = os.getenv("PROXY_PASS", "")
 
 # Construct proxy URL
 if PROXY_HOST and PROXY_PORT and PROXY_USER and PROXY_PASS:
@@ -87,10 +88,7 @@ else:
     PROXY_URL = os.getenv("PROXY_URL", "")
 
 # Rotation API URL - called when rate limited to get a new IP
-PROXY_ROTATION_URL = os.getenv(
-    "PROXY_ROTATION_URL", 
-    "https://api.proxidize.com/api/v1/modem-token-command/rotate-modem-ip/36ecef9633264bb408b82f8822a70f48/"
-)
+PROXY_ROTATION_URL = os.getenv("PROXY_ROTATION_URL", "")
 
 # Rate limit wait time after rotating IP (seconds)
 RATE_LIMIT_WAIT_SECONDS = int(os.getenv("RATE_LIMIT_WAIT_SECONDS", "10"))
