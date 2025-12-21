@@ -7,6 +7,7 @@ Captures weekly visitors, weekly contributions, rules, and other metadata.
 import asyncio
 import re
 import logging
+import json
 from typing import Optional
 from datetime import datetime
 
@@ -15,6 +16,16 @@ from supabase_client import SupabaseClient
 from config import DELAY_MIN, DELAY_MAX, ROTATE_EVERY
 
 logger = logging.getLogger(__name__)
+
+# #region agent log
+DEBUG_LOG_PATH = "/Users/calummelling/Desktop/redditscraper/.cursor/debug.log"
+def debug_log(hypothesis_id, location, message, data=None):
+    import time
+    try:
+        with open(DEBUG_LOG_PATH, "a") as f:
+            f.write(json.dumps({"hypothesisId": hypothesis_id, "location": location, "message": message, "data": data, "timestamp": int(time.time()*1000), "sessionId": "debug-session"}) + "\n")
+    except: pass
+# #endregion
 
 
 def parse_metric_value(text: str) -> Optional[int]:
@@ -124,13 +135,26 @@ class SubredditIntelScraper:
             await self.browser.handle_nsfw_consent()
             await asyncio.sleep(1)  # Wait for any transitions
             
+            # #region agent log
+            # Check page title and URL after consent
+            page = self.browser.page
+            current_url = page.url
+            title = await page.title()
+            debug_log("H2", "intel_scraper:post_consent", "Page state after consent", {"url": current_url, "title": title})
+            # #endregion
+            
             # Human-like behavior
             await self.browser.move_mouse_randomly()
             await self.browser.human_delay(2.0, 4.0)
             await self.browser.scroll_naturally(2)
             
+            # #region agent log
+            # Check if page has expected content structure
+            body_text = await page.evaluate('() => document.body.innerText.substring(0, 2000)')
+            debug_log("H3", "intel_scraper:page_text", "Page body text after scroll", {"text": body_text[:1500] if body_text else "EMPTY"})
+            # #endregion
+            
             # Extract data from the page
-            page = self.browser.page
             data = {}
             
             # Extract weekly visitors
@@ -187,6 +211,16 @@ class SubredditIntelScraper:
         try:
             content = await page.content()
             
+            # #region agent log
+            # Log a snippet of the page content around "weekly" to see actual format
+            weekly_idx = content.lower().find('weekly')
+            if weekly_idx > 0:
+                snippet = content[max(0, weekly_idx-200):weekly_idx+300]
+                debug_log("H1", "intel_scraper:weekly_visitors", "Page content around 'weekly'", {"snippet": snippet[:500], "found_at": weekly_idx})
+            else:
+                debug_log("H1", "intel_scraper:weekly_visitors", "No 'weekly' found in page", {"content_len": len(content), "sample": content[:1000]})
+            # #endregion
+            
             # Look for patterns like "559K\nWeekly visitors" or similar
             patterns = [
                 r'([\d,\.]+[KMB]?)\s*(?:<[^>]*>)*\s*Weekly visitors',
@@ -195,6 +229,9 @@ class SubredditIntelScraper:
             
             for pattern in patterns:
                 match = re.search(pattern, content, re.IGNORECASE)
+                # #region agent log
+                debug_log("H1", "intel_scraper:regex_match", f"Pattern match result", {"pattern": pattern[:50], "matched": match is not None, "groups": match.groups() if match else None})
+                # #endregion
                 if match:
                     value = parse_metric_value(match.group(1))
                     if value:
@@ -202,6 +239,9 @@ class SubredditIntelScraper:
             
             # Fallback: try to find strong elements near "Weekly visitors"
             elements = await page.query_selector_all('strong')
+            # #region agent log
+            debug_log("H4", "intel_scraper:strong_elements", f"Found strong elements", {"count": len(elements)})
+            # #endregion
             for el in elements:
                 text = await el.text_content()
                 if text:
@@ -216,6 +256,9 @@ class SubredditIntelScraper:
             
         except Exception as e:
             logger.debug(f"Error extracting weekly visitors: {e}")
+            # #region agent log
+            debug_log("H1", "intel_scraper:weekly_visitors_error", str(e), {})
+            # #endregion
             return None
     
     async def _extract_weekly_contributions(self, page) -> Optional[int]:
@@ -259,6 +302,14 @@ class SubredditIntelScraper:
         try:
             content = await page.content()
             
+            # #region agent log
+            # Search for "members" text to see format
+            members_idx = content.lower().find('members')
+            if members_idx > 0:
+                snippet = content[max(0, members_idx-150):members_idx+100]
+                debug_log("H5", "intel_scraper:subscribers", "Content around 'members'", {"snippet": snippet[:300]})
+            # #endregion
+            
             # Look for subscriber patterns
             patterns = [
                 r'([\d,\.]+[KMB]?)\s*(?:<[^>]*>)*\s*(?:members|subscribers)',
@@ -267,6 +318,9 @@ class SubredditIntelScraper:
             
             for pattern in patterns:
                 match = re.search(pattern, content, re.IGNORECASE)
+                # #region agent log
+                debug_log("H5", "intel_scraper:sub_pattern", f"Subscriber pattern", {"pattern": pattern[:40], "matched": match is not None, "value": match.group(1) if match else None})
+                # #endregion
                 if match:
                     value = parse_metric_value(match.group(1))
                     if value:
