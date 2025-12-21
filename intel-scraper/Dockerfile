@@ -23,9 +23,10 @@ RUN playwright install chromium
 # Copy application code
 COPY . .
 
-# Create non-root user for security
-RUN useradd -m -u 1000 scraper && chown -R scraper:scraper /app
-USER scraper
+# Use the existing pwuser from Playwright image (UID 1000)
+# Just ensure they own the app directory
+RUN chown -R pwuser:pwuser /app
+USER pwuser
 
 # Default command - run the intel worker
 CMD ["python", "intel_worker.py"]
