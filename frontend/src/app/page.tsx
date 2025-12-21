@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { RefreshCw, Zap, Undo2 } from "lucide-react";
+import { RefreshCw, Zap, Undo2, BarChart3, Users } from "lucide-react";
 import {
   getPendingLeads,
   getLeadsByStatus,
@@ -24,6 +24,7 @@ import { LeadsList } from "@/components/LeadsList";
 import { SubredditSelector } from "@/components/SubredditSelector";
 import { KeywordManager } from "@/components/KeywordManager";
 import { SortSelector, type SortOption } from "@/components/SortSelector";
+import { SubredditExplorer } from "@/components/SubredditExplorer";
 
 // History entry for undo
 interface SwipeHistoryEntry {
@@ -31,7 +32,11 @@ interface SwipeHistoryEntry {
   action: "approved" | "rejected" | "superliked";
 }
 
+// Main navigation views
+type MainView = "leads" | "subreddits";
+
 export default function Home() {
+  const [mainView, setMainView] = useState<MainView>("leads");
   const [leads, setLeads] = useState<RedditLead[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [swipeHistory, setSwipeHistory] = useState<SwipeHistoryEntry[]>([]);
@@ -389,64 +394,101 @@ export default function Home() {
         <div>
           <h1 className="text-3xl font-bold gradient-text flex items-center gap-2">
             <Zap className="text-primary" />
-            Lead Swiper
+            Reddit Scraper
           </h1>
           <p className="text-muted-foreground mt-1">
-            Swipe through Reddit leads for your OF agency
+            Discover leads and analyze subreddits
           </p>
         </div>
-        <button
-          onClick={handleRefresh}
-          disabled={isRefreshing}
-          className="p-3 rounded-xl bg-secondary hover:bg-secondary/80 text-foreground transition-all disabled:opacity-50"
-          title="Refresh data"
-        >
-          <RefreshCw
-            size={20}
-            className={isRefreshing ? "animate-spin" : ""}
-          />
-        </button>
-      </header>
-
-      {/* Filters row */}
-      <div className="relative z-30 flex items-center justify-between gap-4 mb-6 flex-wrap">
-        <div className="flex items-center gap-4">
-          <SubredditSelector
-            subreddits={subreddits}
-            excludedSubreddits={excludedSubreddits}
-            onExclusionChange={(excluded) => {
-              setExcludedSubreddits(excluded);
-              setSwipeHistory([]); // Clear undo history when filter changes
-            }}
-            pendingCounts={subredditPendingCounts}
-          />
-          {excludedSubreddits.size > 0 && (
-            <span className="text-sm text-muted-foreground">
-              Hiding {excludedSubreddits.size} subreddit{excludedSubreddits.size > 1 ? "s" : ""}
-            </span>
-          )}
+        
+        {/* Main Navigation Tabs */}
+        <div className="flex items-center gap-2 bg-secondary rounded-xl p-1">
+          <button
+            onClick={() => setMainView("leads")}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
+              mainView === "leads"
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Users size={18} />
+            Leads
+          </button>
+          <button
+            onClick={() => setMainView("subreddits")}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
+              mainView === "subreddits"
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <BarChart3 size={18} />
+            Subreddits
+          </button>
         </div>
         
-        <div className="flex items-center gap-3">
-          {/* Sort Selector - only show for pending leads */}
-          {currentFilter === "pending" && (
-            <SortSelector currentSort={sortBy} onSortChange={setSortBy} />
-          )}
-          
-          {/* Keyword Manager */}
-          <KeywordManager onJobQueued={() => fetchSubreddits()} />
-        </div>
-      </div>
+        {mainView === "leads" && (
+          <button
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className="p-3 rounded-xl bg-secondary hover:bg-secondary/80 text-foreground transition-all disabled:opacity-50"
+            title="Refresh data"
+          >
+            <RefreshCw
+              size={20}
+              className={isRefreshing ? "animate-spin" : ""}
+            />
+          </button>
+        )}
+      </header>
 
-      {/* Stats bar with filters */}
-      <StatsBar
-        stats={stats}
-        currentFilter={currentFilter}
-        onFilterChange={setCurrentFilter}
-      />
+      {/* Subreddit Explorer View */}
+      {mainView === "subreddits" && (
+        <SubredditExplorer />
+      )}
+      
+      {/* Leads View */}
+      {mainView === "leads" && (
+        <>
+          {/* Filters row */}
+          <div className="relative z-30 flex items-center justify-between gap-4 mb-6 flex-wrap">
+            <div className="flex items-center gap-4">
+              <SubredditSelector
+                subreddits={subreddits}
+                excludedSubreddits={excludedSubreddits}
+                onExclusionChange={(excluded) => {
+                  setExcludedSubreddits(excluded);
+                  setSwipeHistory([]); // Clear undo history when filter changes
+                }}
+                pendingCounts={subredditPendingCounts}
+              />
+              {excludedSubreddits.size > 0 && (
+                <span className="text-sm text-muted-foreground">
+                  Hiding {excludedSubreddits.size} subreddit{excludedSubreddits.size > 1 ? "s" : ""}
+                </span>
+              )}
+            </div>
+            
+            <div className="flex items-center gap-3">
+              {/* Sort Selector - only show for pending leads */}
+              {currentFilter === "pending" && (
+                <SortSelector currentSort={sortBy} onSortChange={setSortBy} />
+              )}
+              
+              {/* Keyword Manager */}
+              <KeywordManager onJobQueued={() => fetchSubreddits()} />
+            </div>
+          </div>
 
-      {/* Main content area */}
-      <div className="relative min-h-[600px]">
+          {/* Stats bar with filters */}
+          <StatsBar
+            stats={stats}
+            currentFilter={currentFilter}
+            onFilterChange={setCurrentFilter}
+          />
+
+          {/* Main content area */}
+          <div className="relative min-h-[600px]">
         {isLoading ? (
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="text-center space-y-4">
@@ -565,7 +607,9 @@ export default function Home() {
             />
           </motion.div>
         )}
-      </div>
+          </div>
+        </>
+      )}
     </main>
   );
 }

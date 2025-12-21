@@ -667,3 +667,123 @@ export async function getContactedLeads(
   return data || [];
 }
 
+// =============================================================================
+// SUBREDDIT INTEL - Detailed subreddit metrics with weekly engagement data
+// =============================================================================
+
+export interface SubredditIntel {
+  id: string;
+  subreddit_name: string;
+  display_name: string | null;
+  subscribers: number | null;
+  weekly_visitors: number | null;
+  weekly_contributions: number | null;
+  competition_score: number | null;
+  description: string | null;
+  rules_count: number;
+  created_utc: string | null;
+  is_verified: boolean;
+  allows_images: boolean;
+  allows_videos: boolean;
+  allows_polls: boolean;
+  post_requirements: Record<string, unknown>;
+  moderator_count: number;
+  community_icon_url: string | null;
+  banner_url: string | null;
+  last_scraped_at: string | null;
+  scrape_status: "pending" | "processing" | "completed" | "failed";
+  error_message: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SubredditIntelFilters {
+  minSubscribers?: number;
+  maxSubscribers?: number;
+  minWeeklyVisitors?: number;
+  maxCompetitionScore?: number;
+  search?: string;
+  sortBy?: "subscribers" | "weekly_visitors" | "weekly_contributions" | "competition_score";
+  sortDesc?: boolean;
+}
+
+export async function getSubredditIntel(
+  limit = 100,
+  offset = 0,
+  filters: SubredditIntelFilters = {}
+): Promise<SubredditIntel[]> {
+  let query = supabase
+    .from("nsfw_subreddit_intel")
+    .select("*")
+    .eq("scrape_status", "completed");
+
+  // Apply filters
+  if (filters.minSubscribers) {
+    query = query.gte("subscribers", filters.minSubscribers);
+  }
+  if (filters.maxSubscribers) {
+    query = query.lte("subscribers", filters.maxSubscribers);
+  }
+  if (filters.minWeeklyVisitors) {
+    query = query.gte("weekly_visitors", filters.minWeeklyVisitors);
+  }
+  if (filters.maxCompetitionScore) {
+    query = query.lte("competition_score", filters.maxCompetitionScore);
+  }
+  if (filters.search) {
+    query = query.ilike("subreddit_name", `%${filters.search}%`);
+  }
+
+  // Apply sorting
+  const sortBy = filters.sortBy || "weekly_visitors";
+  const sortDesc = filters.sortDesc !== false;
+  query = query.order(sortBy, { ascending: !sortDesc, nullsFirst: false });
+
+  // Pagination
+  query = query.range(offset, offset + limit - 1);
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.error("Error fetching subreddit intel:", error);
+    return [];
+  }
+
+  return data || [];
+}
+
+export async function getSubredditIntelStats(): Promise<{
+  total: number;
+  completed: number;
+  pending: number;
+  failed: number;
+  avgCompetitionScore: number | null;
+}> {
+  const { data, error } = await supabase
+    .from("nsfw_subreddit_intel")
+    .select("scrape_status, competition_score");
+
+  if (error) {
+    console.error("Error fetching intel stats:", error);
+    return { total: 0, completed: 0, pending: 0, failed: 0, avgCompetitionScore: null };
+  }
+
+  const items = data || [];
+  const completed = items.filter(d => d.scrape_status === "completed");
+  const competitionScores = completed
+    .map(d => d.competition_score)
+    .filter((s): s is number => s !== null);
+
+  const avgCompetition = competitionScores.length > 0
+    ? competitionScores.reduce((a, b) => a + b, 0) / competitionScores.length
+    : null;
+
+  return {
+    total: items.length,
+    completed: completed.length,
+    pending: items.filter(d => d.scrape_status === "pending").length,
+    failed: items.filter(d => d.scrape_status === "failed").length,
+    avgCompetitionScore: avgCompetition,
+  };
+}
+

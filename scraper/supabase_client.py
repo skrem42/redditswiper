@@ -489,5 +489,3 @@ class SupabaseClient:
         except Exception as e:
             print(f"Error resetting stale processing: {e}")
             return 0
-
-

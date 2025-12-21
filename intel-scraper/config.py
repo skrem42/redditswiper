@@ -1,0 +1,55 @@
+"""
+Configuration for the Intel Scraper Worker.
+Set environment variables for production deployment.
+"""
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# =============================================================================
+# SUPABASE CONFIGURATION
+# =============================================================================
+SUPABASE_URL = os.getenv("SUPABASE_URL", "")
+SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY", "")
+
+# =============================================================================
+# PROXY CONFIGURATION
+# =============================================================================
+# Single rotating proxy with IP rotation API
+PROXY_HOST = os.getenv("PROXY_HOST", "")
+PROXY_PORT = os.getenv("PROXY_PORT", "")
+PROXY_USER = os.getenv("PROXY_USER", "")
+PROXY_PASS = os.getenv("PROXY_PASS", "")
+
+# Construct proxy URL
+if PROXY_HOST and PROXY_PORT and PROXY_USER and PROXY_PASS:
+    PROXY_URL = f"http://{PROXY_USER}:{PROXY_PASS}@{PROXY_HOST}:{PROXY_PORT}"
+else:
+    PROXY_URL = os.getenv("PROXY_URL", "")
+
+# Rotation API URL - called to get a new IP
+PROXY_ROTATION_URL = os.getenv("PROXY_ROTATION_URL", "")
+
+# =============================================================================
+# SCRAPER SETTINGS
+# =============================================================================
+# Minimum subscribers to scrape a subreddit
+CRAWLER_MIN_SUBSCRIBERS = int(os.getenv("CRAWLER_MIN_SUBSCRIBERS", "5000"))
+
+# Batch size per worker cycle
+BATCH_SIZE = int(os.getenv("BATCH_SIZE", "20"))
+
+# Delay between requests (seconds)
+DELAY_MIN = float(os.getenv("DELAY_MIN", "5.0"))
+DELAY_MAX = float(os.getenv("DELAY_MAX", "10.0"))
+
+# Rotate IP every N subreddits
+ROTATE_EVERY = int(os.getenv("ROTATE_EVERY", "7"))
+
+# Wait time when queue is empty (seconds)
+IDLE_WAIT = int(os.getenv("IDLE_WAIT", "120"))
+
+# Run browser in headless mode
+HEADLESS = os.getenv("HEADLESS", "true").lower() == "true"
+
