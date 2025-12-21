@@ -121,12 +121,19 @@ class SubredditCrawler:
             )
             
             if not posts:
-                logger.warning(f"No posts found in r/{sub_name} (403 blocked or empty)")
-                # Mark as failed so it can be retried later when proxy is fixed
-                await self.supabase.fail_subreddit_crawl(
-                    queue_id, 
-                    "No posts returned - likely 403 blocked or empty subreddit"
-                )
+                # Check if we're being IP blocked (RedditClient tracks consecutive 403s)
+                if hasattr(self.reddit, 'consecutive_403s') and self.reddit.consecutive_403s > 0:
+                    logger.warning(f"No posts from r/{sub_name} - 403 blocked (IP may be blocked)")
+                    await self.supabase.fail_subreddit_crawl(
+                        queue_id, 
+                        f"403 blocked - IP rotation needed (403 count: {self.reddit.consecutive_403s})"
+                    )
+                else:
+                    logger.warning(f"No posts found in r/{sub_name} (empty or private)")
+                    await self.supabase.fail_subreddit_crawl(
+                        queue_id, 
+                        "No posts returned - subreddit may be empty or private"
+                    )
                 return
             
             logger.info(f"  Found {len(posts)} posts")

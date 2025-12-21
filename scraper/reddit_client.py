@@ -51,6 +51,10 @@ class RedditClient:
         
         # Track rate limit rotations
         self.rotation_count = 0
+        
+        # Track consecutive 403s (indicates IP block, not just single sub issue)
+        self.consecutive_403s = 0
+        self.max_403s_before_rotation = 2  # Rotate after 2 consecutive 403s
 
     async def __aenter__(self):
         # Configure proxy if available
@@ -106,21 +110,51 @@ class RedditClient:
         await self._rate_limit()
         try:
             response = await self.client.get(url)
+            
+            # Handle 429 rate limit
             if response.status_code == 429:
-                # Rate limited - rotate IP and retry with reduced wait time
                 print(f"[Worker {self.worker_id}] Rate limited (429). Rotating IP and waiting {RATE_LIMIT_WAIT_SECONDS}s...")
+                self.consecutive_403s = 0  # Reset 403 counter
                 await self._rotate_ip()
                 await asyncio.sleep(RATE_LIMIT_WAIT_SECONDS)
                 return await self._get_json(url)
+            
+            # Handle 403 forbidden - Reddit IP block
+            if response.status_code == 403:
+                self.consecutive_403s += 1
+                print(f"[Worker {self.worker_id}] 403 Forbidden (count: {self.consecutive_403s}/{self.max_403s_before_rotation})")
+                
+                if self.consecutive_403s >= self.max_403s_before_rotation:
+                    print(f"[Worker {self.worker_id}] 🚨 IP appears blocked! Rotating IP and waiting 60s...")
+                    await self._rotate_ip()
+                    self.consecutive_403s = 0  # Reset counter after rotation
+                    await asyncio.sleep(60)  # Wait longer after 403 block
+                    return await self._get_json(url)  # Retry this request
+                
+                return None  # Return None for first 403, let crawler try next sub
+            
+            # Success - reset 403 counter
+            self.consecutive_403s = 0
             response.raise_for_status()
             return response.json()
+            
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 429:
-                # Handle 429 raised as exception
                 print(f"[Worker {self.worker_id}] Rate limited (429 exception). Rotating IP and waiting {RATE_LIMIT_WAIT_SECONDS}s...")
+                self.consecutive_403s = 0
                 await self._rotate_ip()
                 await asyncio.sleep(RATE_LIMIT_WAIT_SECONDS)
                 return await self._get_json(url)
+            if e.response.status_code == 403:
+                self.consecutive_403s += 1
+                print(f"[Worker {self.worker_id}] 403 Forbidden exception (count: {self.consecutive_403s})")
+                if self.consecutive_403s >= self.max_403s_before_rotation:
+                    print(f"[Worker {self.worker_id}] 🚨 IP appears blocked! Rotating IP...")
+                    await self._rotate_ip()
+                    self.consecutive_403s = 0
+                    await asyncio.sleep(60)
+                    return await self._get_json(url)
+                return None
             print(f"[Worker {self.worker_id}] HTTP error for {url}: {e}")
             return None
         except Exception as e:

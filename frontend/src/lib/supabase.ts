@@ -266,20 +266,38 @@ export interface Subreddit {
 export async function getSubreddits(): Promise<Subreddit[]> {
   // Fetch from subreddit_queue (where crawler puts discovered subs)
   // Only show completed or processing subs (actively being crawled)
-  const { data, error } = await supabase
-    .from("subreddit_queue")
-    .select("*")
-    .in("status", ["completed", "processing"])
-    .order("subscribers", { ascending: false }); // Biggest subs first
+  // Use pagination to bypass Supabase's PostgREST max_rows limit (default 1000)
+  const allData: any[] = [];
+  const pageSize = 1000;
+  let offset = 0;
+  let hasMore = true;
 
-  if (error) {
-    console.error("Error fetching subreddits:", error);
-    return [];
+  while (hasMore) {
+    const { data, error } = await supabase
+      .from("subreddit_queue")
+      .select("*")
+      .in("status", ["completed", "processing"])
+      .order("subscribers", { ascending: false })
+      .range(offset, offset + pageSize - 1);
+
+    if (error) {
+      console.error("Error fetching subreddits:", error);
+      break;
+    }
+
+    if (data && data.length > 0) {
+      allData.push(...data);
+      offset += pageSize;
+      // If we got fewer results than pageSize, we've reached the end
+      hasMore = data.length === pageSize;
+    } else {
+      hasMore = false;
+    }
   }
 
   // Map subreddit_queue fields to Subreddit interface
   // Include status as an extra property for active indicator
-  return (data || []).map(sub => ({
+  return allData.map(sub => ({
     id: sub.id,
     name: sub.subreddit_name,
     display_name: `r/${sub.subreddit_name}`,
