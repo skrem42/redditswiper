@@ -84,25 +84,47 @@ class RedditClient:
         self.last_request_time = asyncio.get_event_loop().time()
 
     async def _rotate_ip(self):
-        """Call the proxy rotation API to get a new IP address."""
-        if not PROXY_ROTATION_URL:
-            print(f"[Worker {self.worker_id}] No rotation URL configured, skipping IP rotation")
-            return False
+        """
+        Call the proxy rotation API to get a new IP address.
+        If no rotation API is configured, recreate the HTTP client to force new connection.
+        """
+        if PROXY_ROTATION_URL:
+            try:
+                # Use a separate client without proxy to call the rotation API
+                async with httpx.AsyncClient(timeout=30.0) as rotation_client:
+                    print(f"[Worker {self.worker_id}] Rotating proxy IP via API...")
+                    response = await rotation_client.get(PROXY_ROTATION_URL)
+                    if response.status_code == 200:
+                        self.rotation_count += 1
+                        print(f"[Worker {self.worker_id}] ✓ IP rotated successfully (rotation #{self.rotation_count})")
+                        return True
+                    else:
+                        print(f"[Worker {self.worker_id}] ✗ IP rotation failed: {response.status_code}")
+            except Exception as e:
+                print(f"[Worker {self.worker_id}] ✗ IP rotation error: {e}")
         
+        # No rotation URL OR rotation failed - recreate client to force new connection
+        # Many rotating proxies give a new IP on each new connection
+        print(f"[Worker {self.worker_id}] Recreating HTTP client to force new connection...")
         try:
-            # Use a separate client without proxy to call the rotation API
-            async with httpx.AsyncClient(timeout=30.0) as rotation_client:
-                print(f"[Worker {self.worker_id}] Rotating proxy IP via API...")
-                response = await rotation_client.get(PROXY_ROTATION_URL)
-                if response.status_code == 200:
-                    self.rotation_count += 1
-                    print(f"[Worker {self.worker_id}] ✓ IP rotated successfully (rotation #{self.rotation_count})")
-                    return True
-                else:
-                    print(f"[Worker {self.worker_id}] ✗ IP rotation failed: {response.status_code}")
-                    return False
+            if self.client:
+                await self.client.aclose()
+            
+            transport = None
+            if self.proxy:
+                transport = httpx.AsyncHTTPTransport(proxy=self.proxy)
+            
+            self.client = httpx.AsyncClient(
+                headers=self.headers,
+                timeout=30.0,
+                follow_redirects=True,
+                transport=transport,
+            )
+            self.rotation_count += 1
+            print(f"[Worker {self.worker_id}] ✓ Client recreated (rotation #{self.rotation_count})")
+            return True
         except Exception as e:
-            print(f"[Worker {self.worker_id}] ✗ IP rotation error: {e}")
+            print(f"[Worker {self.worker_id}] ✗ Client recreation failed: {e}")
             return False
 
     async def _get_json(self, url: str) -> Optional[dict]:
@@ -214,8 +236,26 @@ class RedditClient:
                 url += f"&after={after}"
             
             data = await self._get_json(url)
+            
+            # Detect "empty response" blocks (Reddit returns 200 with no data when IP blocked)
             if not data or "data" not in data:
-                break
+                self.consecutive_403s += 1
+                print(f"[Worker {self.worker_id}] Empty response for r/{subreddit} (block count: {self.consecutive_403s}/{self.max_403s_before_rotation})")
+                
+                if self.consecutive_403s >= self.max_403s_before_rotation:
+                    print(f"[Worker {self.worker_id}] 🚨 Multiple empty responses - IP likely blocked! Rotating...")
+                    await self._rotate_ip()
+                    self.consecutive_403s = 0
+                    await asyncio.sleep(60)
+                    # Retry this subreddit after rotation
+                    data = await self._get_json(url)
+                    if not data or "data" not in data:
+                        break  # Still failing after rotation, give up on this sub
+                else:
+                    break  # First empty response, just skip this sub
+            
+            # Success - reset block counter
+            self.consecutive_403s = 0
             
             children = data["data"].get("children", [])
             if not children:
