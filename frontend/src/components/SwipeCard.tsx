@@ -226,7 +226,7 @@ export function SwipeCard({ lead, onSwipe, onSuperLike, isActive }: SwipeCardPro
   return (
     <>
       <motion.div
-        className="absolute inset-0 flex items-center justify-center"
+        className="absolute inset-0 flex items-start justify-center pt-4"
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={exitDirection ? exitVariants[exitDirection] : { opacity: 0, scale: 0.8 }}

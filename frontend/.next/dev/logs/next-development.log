@@ -1,40 +1,22 @@
-[00:00:01.178] Server  LOG     ✓ Ready in 868ms
-[00:00:07.896] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[00:04:21.775] Server  LOG     ✓ Compiled in 878ms
-[00:04:51.286] Server  LOG     ✓ Compiled in 107ms
-[00:05:11.726] Server  LOG     ✓ Compiled in 66ms
-[00:05:23.653] Server  LOG     ✓ Compiled in 29ms
-[00:05:49.461] Server  LOG     ✓ Compiled in 83ms
-[00:17:31.000] Server  LOG     ✓ Compiled in 587ms
-[00:17:32.058] Browser ERROR   uncaughtError: TypeError: Cannot read properties of undefined (reading 'size')
-[00:17:42.347] Server  WARN    ⚠ Fast Refresh had to perform a full reload due to a runtime error.
-[00:17:42.495] Server  LOG     ✓ Compiled in 54ms
-[00:17:42.600] Server  ERROR   ⨯ ReferenceError: selectedSubreddit is not defined
-[00:17:42.821] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[00:17:43.064] Browser ERROR   uncaughtError: ReferenceError: selectedSubreddit is not defined
-[00:18:01.947] Server  WARN    ⚠ Fast Refresh had to perform a full reload due to a runtime error.
-[00:18:01.965] Server  LOG     ✓ Compiled in 125ms
-[00:18:02.367] Server  ERROR   ⨯ ReferenceError: selectedSubreddit is not defined
-[00:18:02.495] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[00:18:03.059] Browser ERROR   uncaughtError: ReferenceError: selectedSubreddit is not defined
-[00:18:08.066] Server  WARN    ⚠ Fast Refresh had to perform a full reload due to a runtime error.
-[00:18:08.157] Server  LOG     ✓ Compiled in 33ms
-[00:18:08.219] Server  ERROR   ⨯ ReferenceError: selectedSubreddit is not defined
-[00:18:08.383] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[00:18:09.061] Browser ERROR   uncaughtError: ReferenceError: selectedSubreddit is not defined
-[00:18:20.414] Server  WARN    ⚠ Fast Refresh had to perform a full reload due to a runtime error.
-[00:18:20.430] Server  LOG     ✓ Compiled in 187ms
-[00:18:21.118] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[00:40:52.882] Server  LOG     ✓ Compiled in 152ms
-[00:40:53.057] Browser WARN    GoTrueClient@sb-jmchmbwhnmlednaycxqh-auth-token:1 (2.89.0) 2025-12-20T18:47:55.705Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key.
-[00:40:59.253] Server  LOG     ✓ Compiled in 10ms
-[00:41:00.075] Browser WARN    GoTrueClient@sb-jmchmbwhnmlednaycxqh-auth-token:2 (2.89.0) 2025-12-20T18:48:02.051Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key.
-[00:41:05.141] Server  LOG     ✓ Compiled in 9ms
-[00:41:06.057] Browser WARN    GoTrueClient@sb-jmchmbwhnmlednaycxqh-auth-token:3 (2.89.0) 2025-12-20T18:48:07.946Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key.
-[00:41:19.338] Server  LOG     ✓ Compiled in 122ms
-[00:41:59.505] Server  LOG     ✓ Compiled in 33ms
-[00:42:13.961] Server  LOG     ✓ Compiled in 30ms
-[00:42:31.705] Server  LOG     ✓ Compiled in 47ms
-[00:42:42.759] Server  LOG     ✓ Compiled in 17ms
-[00:42:43.058] Browser WARN    GoTrueClient@sb-jmchmbwhnmlednaycxqh-auth-token:4 (2.89.0) 2025-12-20T18:49:45.565Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key.
-[00:43:08.009] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:00:00.903] Server  LOG     ✓ Ready in 639ms
+[00:00:09.447] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:03:01.250] Server  LOG     ✓ Compiled in 60ms
+[00:03:10.511] Server  LOG     ✓ Compiled in 39ms
+[00:05:31.795] Server  LOG     ✓ Compiled in 41ms
+[00:05:46.963] Server  LOG     ✓ Compiled in 87ms
+[00:06:10.657] Server  LOG     ✓ Compiled in 103ms
+[00:10:54.299] Server  LOG     ✓ Compiled in 54ms
+[00:11:03.387] Server  LOG     ✓ Compiled in 31ms
+[00:11:12.200] Server  LOG     ✓ Compiled in 28ms
+[00:11:18.372] Server  LOG     ✓ Compiled in 27ms
+[00:12:17.593] Server  LOG     ✓ Compiled in 10ms
+[00:12:17.669] Browser WARN    GoTrueClient@sb-jmchmbwhnmlednaycxqh-auth-token:1 (2.89.0) 2025-12-21T07:41:52.385Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key.
+[00:17:12.292] Server  LOG     ✓ Compiled in 40ms
+[00:17:13.242] Browser WARN    GoTrueClient@sb-jmchmbwhnmlednaycxqh-auth-token:2 (2.89.0) 2025-12-21T07:46:47.086Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key.
+[00:17:22.027] Server  LOG     ✓ Compiled in 16ms
+[00:17:22.242] Browser WARN    GoTrueClient@sb-jmchmbwhnmlednaycxqh-auth-token:3 (2.89.0) 2025-12-21T07:46:56.819Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key.
+[00:17:35.186] Server  LOG     ✓ Compiled in 48ms
+[00:17:48.607] Server  LOG     ✓ Compiled in 71ms
+[00:18:07.788] Server  LOG     ✓ Compiled in 33ms
+[00:18:20.862] Server  LOG     ✓ Compiled in 56ms
+[00:18:37.904] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold

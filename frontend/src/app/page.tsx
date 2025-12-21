@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { RefreshCw, Zap, Undo2 } from "lucide-react";
 import {
@@ -11,15 +11,19 @@ import {
   updateLeadStatus,
   getStats,
   getSubreddits,
+  releaseLeadClaims,
+  refreshLeadClaims,
   type RedditLead,
   type Stats,
   type Subreddit,
 } from "@/lib/supabase";
+import { getDeviceId } from "@/lib/deviceId";
 import { SwipeCard } from "@/components/SwipeCard";
 import { StatsBar } from "@/components/StatsBar";
 import { LeadsList } from "@/components/LeadsList";
 import { SubredditSelector } from "@/components/SubredditSelector";
 import { KeywordManager } from "@/components/KeywordManager";
+import { SortSelector, type SortOption } from "@/components/SortSelector";
 
 // History entry for undo
 interface SwipeHistoryEntry {
@@ -44,11 +48,20 @@ export default function Home() {
   const [currentFilter, setCurrentFilter] = useState("pending");
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [sortBy, setSortBy] = useState<SortOption>("avg_upvotes");
+  
+  // Device ID for claim system
+  const [deviceId, setDeviceId] = useState<string>("");
   
   // Subreddit filtering - multi-select exclusion
   const [subreddits, setSubreddits] = useState<Subreddit[]>([]);
   const [excludedSubreddits, setExcludedSubreddits] = useState<Set<string>>(new Set());
   const [subredditPendingCounts, setSubredditPendingCounts] = useState<Record<string, number>>({});
+  
+  // Initialize device ID on mount
+  useEffect(() => {
+    setDeviceId(getDeviceId());
+  }, []);
 
   // Fetch subreddits
   const fetchSubreddits = useCallback(async () => {
@@ -86,12 +99,15 @@ export default function Home() {
 
   // Fetch leads based on current filter and excluded subreddits
   const fetchLeads = useCallback(async () => {
+    if (!deviceId) return; // Wait for device ID to be set
+    
     setIsLoading(true);
     try {
       let data: RedditLead[];
       
       if (currentFilter === "pending") {
-        data = await getPendingLeads(100); // Fetch more to filter
+        // Pass deviceId for claim-based filtering
+        data = await getPendingLeads(100, 0, deviceId);
       } else if (currentFilter === "contacted") {
         data = await getContactedLeads(100);
       } else {
@@ -100,9 +116,6 @@ export default function Home() {
       
       // Filter out leads from excluded subreddits
       if (excludedSubreddits.size > 0 && data.length > 0) {
-        // Get subreddit IDs for each lead's posts
-        const { supabase } = await import("@/lib/supabase");
-        
         // For each lead, check if ALL their posts are from excluded subreddits
         const filteredData: RedditLead[] = [];
         
@@ -140,7 +153,7 @@ export default function Home() {
     } finally {
       setIsLoading(false);
     }
-  }, [currentFilter, excludedSubreddits]);
+  }, [currentFilter, excludedSubreddits, deviceId]);
 
   // Fetch stats
   const fetchStats = useCallback(async () => {
@@ -152,12 +165,44 @@ export default function Home() {
     }
   }, []);
 
-  // Initial load
+  // Initial load - wait for device ID
   useEffect(() => {
+    if (!deviceId) return;
     fetchSubreddits();
     fetchLeads();
     fetchStats();
-  }, [fetchSubreddits, fetchLeads, fetchStats]);
+  }, [fetchSubreddits, fetchLeads, fetchStats, deviceId]);
+
+  // Refresh claims periodically to prevent expiry (every 2 minutes)
+  useEffect(() => {
+    if (!deviceId || currentFilter !== "pending" || leads.length === 0) return;
+    
+    const interval = setInterval(async () => {
+      const leadIds = leads.map(l => l.id);
+      await refreshLeadClaims(leadIds, deviceId);
+    }, 2 * 60 * 1000); // 2 minutes
+    
+    return () => clearInterval(interval);
+  }, [deviceId, currentFilter, leads]);
+
+  // Release claims when leaving the page
+  useEffect(() => {
+    if (!deviceId) return;
+    
+    const handleBeforeUnload = () => {
+      // Use sendBeacon for reliable cleanup on page close
+      const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/reddit_leads?claimed_by=eq.${deviceId}&status=eq.pending`;
+      const body = JSON.stringify({ claimed_by: null, claimed_at: null });
+      navigator.sendBeacon(url, body);
+    };
+    
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      // Also release claims when component unmounts (navigation)
+      releaseLeadClaims(deviceId);
+    };
+  }, [deviceId]);
 
   // Keyboard shortcut for undo
   useEffect(() => {
@@ -180,16 +225,16 @@ export default function Home() {
 
   // Handle swipe
   const handleSwipe = async (direction: "left" | "right") => {
-    const currentLead = leads[currentIndex];
-    if (!currentLead) return;
+    const leadToSwipe = sortedLeads[currentIndex];
+    if (!leadToSwipe) return;
 
     const status = direction === "right" ? "approved" : "rejected";
 
     // Add to history for undo
-    setSwipeHistory((prev) => [...prev, { lead: currentLead, action: status }]);
+    setSwipeHistory((prev) => [...prev, { lead: leadToSwipe, action: status }]);
 
-    // Optimistic update
-    setLeads((prev) => prev.filter((_, i) => i !== currentIndex));
+    // Optimistic update - filter by lead ID, not by index
+    setLeads((prev) => prev.filter((lead) => lead.id !== leadToSwipe.id));
     setStats((prev) => ({
       ...prev,
       pending_leads: Math.max(0, prev.pending_leads - 1),
@@ -200,19 +245,19 @@ export default function Home() {
     }));
 
     // Update in database
-    await updateLeadStatus(currentLead.id, status);
+    await updateLeadStatus(leadToSwipe.id, status);
   };
 
   // Handle super like
   const handleSuperLike = async () => {
-    const currentLead = leads[currentIndex];
-    if (!currentLead) return;
+    const leadToSwipe = sortedLeads[currentIndex];
+    if (!leadToSwipe) return;
 
     // Add to history for undo
-    setSwipeHistory((prev) => [...prev, { lead: currentLead, action: "superliked" }]);
+    setSwipeHistory((prev) => [...prev, { lead: leadToSwipe, action: "superliked" }]);
 
-    // Optimistic update
-    setLeads((prev) => prev.filter((_, i) => i !== currentIndex));
+    // Optimistic update - filter by lead ID, not by index
+    setLeads((prev) => prev.filter((lead) => lead.id !== leadToSwipe.id));
     setStats((prev) => ({
       ...prev,
       pending_leads: Math.max(0, prev.pending_leads - 1),
@@ -220,7 +265,7 @@ export default function Home() {
     }));
 
     // Update in database
-    await updateLeadStatus(currentLead.id, "superliked");
+    await updateLeadStatus(leadToSwipe.id, "superliked");
   };
 
   // Handle undo - go back to previous lead
@@ -299,7 +344,42 @@ export default function Home() {
     setIsRefreshing(false);
   };
 
-  const currentLead = leads[currentIndex];
+  // Sort leads based on selected option
+  const sortedLeads = useMemo(() => {
+    if (currentFilter !== "pending") return leads; // Only sort pending leads
+    
+    const leadsWithMetrics = leads.map(lead => {
+      // Calculate average upvotes
+      let avgUpvotes = 0;
+      if (lead.reddit_posts && lead.reddit_posts.length > 0) {
+        const totalUpvotes = lead.reddit_posts.reduce((sum, post) => sum + (post.upvotes || 0), 0);
+        avgUpvotes = totalUpvotes / lead.reddit_posts.length;
+      }
+      
+      // Get posting frequency
+      const postsPerDay = lead.posting_frequency || 0;
+      
+      return { lead, avgUpvotes, postsPerDay };
+    });
+    
+    // Sort based on selected option
+    const sorted = [...leadsWithMetrics].sort((a, b) => {
+      switch (sortBy) {
+        case "avg_upvotes":
+          return b.avgUpvotes - a.avgUpvotes; // Descending
+        case "total_karma":
+          return b.lead.karma - a.lead.karma; // Descending
+        case "posts_per_day":
+          return b.postsPerDay - a.postsPerDay; // Descending
+        default:
+          return 0;
+      }
+    });
+    
+    return sorted.map(item => item.lead);
+  }, [leads, sortBy, currentFilter]);
+
+  const currentLead = sortedLeads[currentIndex];
   const showSwiper = currentFilter === "pending";
 
   return (
@@ -329,7 +409,7 @@ export default function Home() {
       </header>
 
       {/* Filters row */}
-      <div className="flex items-center justify-between gap-4 mb-6">
+      <div className="relative z-30 flex items-center justify-between gap-4 mb-6 flex-wrap">
         <div className="flex items-center gap-4">
           <SubredditSelector
             subreddits={subreddits}
@@ -347,8 +427,15 @@ export default function Home() {
           )}
         </div>
         
-        {/* Keyword Manager */}
-        <KeywordManager onJobQueued={() => fetchSubreddits()} />
+        <div className="flex items-center gap-3">
+          {/* Sort Selector - only show for pending leads */}
+          {currentFilter === "pending" && (
+            <SortSelector currentSort={sortBy} onSortChange={setSortBy} />
+          )}
+          
+          {/* Keyword Manager */}
+          <KeywordManager onJobQueued={() => fetchSubreddits()} />
+        </div>
       </div>
 
       {/* Stats bar with filters */}
@@ -370,11 +457,11 @@ export default function Home() {
         ) : showSwiper ? (
           // Swipe mode for pending leads
           <>
-            {leads.length > 0 ? (
+            {sortedLeads.length > 0 ? (
               <>
                 {/* Card stack indicator */}
                 <div className="text-center mb-4 text-sm text-muted-foreground">
-                  {currentIndex + 1} of {leads.length} pending leads
+                  {currentIndex + 1} of {sortedLeads.length} pending leads
                 </div>
 
                 {/* Swipe cards */}

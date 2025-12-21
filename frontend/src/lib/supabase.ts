@@ -39,6 +39,9 @@ export interface RedditLead {
   created_at: string;
   updated_at: string;
   reddit_posts?: RedditPost[];
+  // Claim fields for multi-user support
+  claimed_by?: string | null;
+  claimed_at?: string | null;
 }
 
 export interface RedditPost {
@@ -71,21 +74,95 @@ export interface Stats {
   contacted_leads: number;
 }
 
+// Claim expiry time in minutes
+const CLAIM_EXPIRY_MINUTES = 5;
+
 // API functions
-export async function getPendingLeads(limit = 50, offset = 0): Promise<RedditLead[]> {
-  const { data, error } = await supabase
+
+/**
+ * Get pending leads with claim-based filtering for multi-user support
+ * Only returns leads that are:
+ * - Not claimed by anyone
+ * - Claimed by the current device
+ * - Have expired claims (older than 5 minutes)
+ * 
+ * After fetching, claims the leads for this device
+ */
+export async function getPendingLeads(
+  limit = 50, 
+  offset = 0,
+  deviceId?: string
+): Promise<RedditLead[]> {
+  // Calculate claim expiry threshold
+  const expiryThreshold = new Date(
+    Date.now() - CLAIM_EXPIRY_MINUTES * 60 * 1000
+  ).toISOString();
+
+  // Build the query - get leads that are claimable
+  let query = supabase
     .from("reddit_leads")
     .select("*, reddit_posts(*)")
     .eq("status", "pending")
-    .order("karma", { ascending: false })
-    .range(offset, offset + limit - 1);
+    .order("karma", { ascending: false });
+
+  if (deviceId) {
+    // Filter for unclaimed, owned, or expired claims
+    // Using OR filter: claimed_by is null OR claimed_by = deviceId OR claimed_at < expiryThreshold
+    query = query.or(
+      `claimed_by.is.null,claimed_by.eq.${deviceId},claimed_at.lt.${expiryThreshold}`
+    );
+  }
+
+  const { data, error } = await query.range(offset, offset + limit - 1);
 
   if (error) {
     console.error("Error fetching leads:", error);
     return [];
   }
 
-  return data || [];
+  const leads = data || [];
+
+  // Claim the fetched leads for this device
+  if (deviceId && leads.length > 0) {
+    const leadIds = leads.map((l) => l.id);
+    const now = new Date().toISOString();
+
+    await supabase
+      .from("reddit_leads")
+      .update({ claimed_by: deviceId, claimed_at: now })
+      .in("id", leadIds)
+      // Only claim if unclaimed or claim expired (avoid stealing active claims)
+      .or(`claimed_by.is.null,claimed_at.lt.${expiryThreshold}`);
+  }
+
+  return leads;
+}
+
+/**
+ * Release claims on leads (e.g., when leaving the page)
+ */
+export async function releaseLeadClaims(deviceId: string): Promise<void> {
+  await supabase
+    .from("reddit_leads")
+    .update({ claimed_by: null, claimed_at: null })
+    .eq("claimed_by", deviceId)
+    .eq("status", "pending");
+}
+
+/**
+ * Refresh claims to prevent expiry while actively swiping
+ */
+export async function refreshLeadClaims(
+  leadIds: string[], 
+  deviceId: string
+): Promise<void> {
+  if (leadIds.length === 0) return;
+  
+  await supabase
+    .from("reddit_leads")
+    .update({ claimed_at: new Date().toISOString() })
+    .in("id", leadIds)
+    .eq("claimed_by", deviceId);
 }
 
 export async function getLeadsByStatus(
@@ -113,9 +190,15 @@ export async function updateLeadStatus(
   status: "approved" | "rejected" | "superliked",
   notes?: string
 ): Promise<boolean> {
+  // Clear claim when status changes (no longer pending)
   const { error: updateError } = await supabase
     .from("reddit_leads")
-    .update({ status, updated_at: new Date().toISOString() })
+    .update({ 
+      status, 
+      updated_at: new Date().toISOString(),
+      claimed_by: null,
+      claimed_at: null,
+    })
     .eq("id", leadId);
 
   if (updateError) {
@@ -138,29 +221,36 @@ export async function updateLeadStatus(
 }
 
 export async function getStats(): Promise<Stats> {
-  const { data: leads } = await supabase
-    .from("reddit_leads")
-    .select("id, status, contacted_at");
-
-  const { count: postsCount } = await supabase
-    .from("reddit_posts")
-    .select("*", { count: "exact", head: true });
-
-  const { count: subredditsCount } = await supabase
-    .from("subreddits")
-    .select("*", { count: "exact", head: true });
-
-  const leadsData = leads || [];
+  // Use count queries to avoid Supabase's default 1000 row limit
+  const [
+    totalLeadsResult,
+    postsResult,
+    subredditsResult,
+    pendingResult,
+    approvedResult,
+    rejectedResult,
+    superlikedResult,
+    contactedResult,
+  ] = await Promise.all([
+    supabase.from("reddit_leads").select("*", { count: "exact", head: true }),
+    supabase.from("reddit_posts").select("*", { count: "exact", head: true }),
+    supabase.from("subreddits").select("*", { count: "exact", head: true }),
+    supabase.from("reddit_leads").select("*", { count: "exact", head: true }).eq("status", "pending"),
+    supabase.from("reddit_leads").select("*", { count: "exact", head: true }).eq("status", "approved"),
+    supabase.from("reddit_leads").select("*", { count: "exact", head: true }).eq("status", "rejected"),
+    supabase.from("reddit_leads").select("*", { count: "exact", head: true }).eq("status", "superliked"),
+    supabase.from("reddit_leads").select("*", { count: "exact", head: true }).not("contacted_at", "is", null),
+  ]);
 
   return {
-    total_leads: leadsData.length,
-    total_posts: postsCount || 0,
-    total_subreddits: subredditsCount || 0,
-    pending_leads: leadsData.filter((l) => l.status === "pending").length,
-    approved_leads: leadsData.filter((l) => l.status === "approved").length,
-    rejected_leads: leadsData.filter((l) => l.status === "rejected").length,
-    superliked_leads: leadsData.filter((l) => l.status === "superliked").length,
-    contacted_leads: leadsData.filter((l) => l.contacted_at !== null).length,
+    total_leads: totalLeadsResult.count || 0,
+    total_posts: postsResult.count || 0,
+    total_subreddits: subredditsResult.count || 0,
+    pending_leads: pendingResult.count || 0,
+    approved_leads: approvedResult.count || 0,
+    rejected_leads: rejectedResult.count || 0,
+    superliked_leads: superlikedResult.count || 0,
+    contacted_leads: contactedResult.count || 0,
   };
 }
 

@@ -227,6 +227,9 @@ Examples:
   python main.py --keywords "fitness,gym,models"    # Custom search keywords
   python main.py --keywords "cosplay" --filters ""  # No name filter (include all results)
   python main.py --show-config                      # Show current configuration
+  python main.py --crawl                            # Run continuous crawler
+  python main.py --crawl-stats                      # Show crawler queue stats
+  python main.py --retry-failed                     # Retry failed subreddits (after fixing proxy)
         """
     )
     parser.add_argument(
@@ -295,6 +298,11 @@ Examples:
         action="store_true",
         help="Show crawler queue statistics"
     )
+    parser.add_argument(
+        "--retry-failed",
+        action="store_true",
+        help="Reset failed subreddits back to pending (for retrying after fixing proxy/issues)"
+    )
     
     args = parser.parse_args()
     
@@ -331,6 +339,88 @@ Examples:
     # Stats only mode
     if args.stats:
         await show_stats(supabase)
+        return
+    
+    # Crawler stats mode
+    if args.crawl_stats:
+        print("\n📊 Crawler Queue Statistics")
+        print("=" * 50)
+        stats = await supabase.get_queue_stats()
+        print(f"Total:      {stats.get('total', 0)}")
+        print(f"Pending:    {stats.get('pending', 0)}")
+        print(f"Processing: {stats.get('processing', 0)}")
+        print(f"Completed:  {stats.get('completed', 0)}")
+        print(f"Failed:     {stats.get('failed', 0)}")
+        print("=" * 50)
+        return
+    
+    # Retry failed subreddits mode
+    if args.retry_failed:
+        print("\n🔄 Retrying Failed/Blocked Subreddits...")
+        print("-" * 50)
+        
+        # Get count of explicitly failed subreddits
+        failed_count = await supabase.get_queue_count(status="failed")
+        print(f"Found {failed_count} explicitly failed subreddits")
+        
+        # For completed with no posts, we need to check manually
+        # Get all completed subs and check if they have posts
+        print("Checking completed subs... (finding ones with no posts)")
+        completed_result = supabase.client.table("subreddit_queue").select(
+            "id, subreddit_name"
+        ).eq("status", "completed").execute()
+        
+        completed_subs = completed_result.data or []
+        print(f"  Checking {len(completed_subs)} completed subreddits...")
+        
+        # Get all subreddit names that have posts
+        posts_result = supabase.client.table("reddit_posts").select(
+            "subreddit_name"
+        ).not_.is_("subreddit_name", "null").execute()
+        
+        subs_with_posts = set(p["subreddit_name"] for p in (posts_result.data or []))
+        
+        # Find completed subs with no posts
+        empty_completed_ids = [
+            sub["id"] for sub in completed_subs 
+            if sub["subreddit_name"] not in subs_with_posts
+        ]
+        
+        empty_count = len(empty_completed_ids)
+        print(f"Found {empty_count} completed subs with no posts (likely 403 blocked)")
+        
+        total = failed_count + empty_count
+        if total == 0:
+            print("✅ No failed subreddits to retry!")
+            return
+        
+        print(f"\n📝 Total to retry: {total} subreddits")
+        print("-" * 50)
+        
+        # Reset explicitly failed ones
+        if failed_count > 0:
+            result1 = supabase.client.table("subreddit_queue").update({
+                "status": "pending",
+                "error_message": None,
+            }).eq("status", "failed").execute()
+            reset1 = len(result1.data) if result1.data else 0
+            print(f"✓ Reset {reset1} failed → pending")
+        
+        # Reset completed ones with no posts (batch update)
+        if empty_count > 0:
+            # Update in chunks of 100 to avoid query limits
+            chunk_size = 100
+            total_reset = 0
+            for i in range(0, len(empty_completed_ids), chunk_size):
+                chunk = empty_completed_ids[i:i+chunk_size]
+                result2 = supabase.client.table("subreddit_queue").update({
+                    "status": "pending",
+                    "error_message": "Retrying - previously marked completed with no posts",
+                }).in_("id", chunk).execute()
+                total_reset += len(result2.data) if result2.data else 0
+            print(f"✓ Reset {total_reset} empty completed → pending")
+        
+        print("\n✅ All subreddits reset! The crawler will retry them once the proxy is working.")
         return
     
     # Jobs mode - process queue from frontend

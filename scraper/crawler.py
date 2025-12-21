@@ -121,8 +121,12 @@ class SubredditCrawler:
             )
             
             if not posts:
-                logger.warning(f"No posts found in r/{sub_name}")
-                await self.supabase.complete_subreddit_crawl(queue_id)
+                logger.warning(f"No posts found in r/{sub_name} (403 blocked or empty)")
+                # Mark as failed so it can be retried later when proxy is fixed
+                await self.supabase.fail_subreddit_crawl(
+                    queue_id, 
+                    "No posts returned - likely 403 blocked or empty subreddit"
+                )
                 return
             
             logger.info(f"  Found {len(posts)} posts")

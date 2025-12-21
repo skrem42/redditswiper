@@ -73,21 +73,21 @@ export function StatsBar({ stats, currentFilter, onFilterChange }: StatsBarProps
         </div>
       </div>
 
-      <div className="flex gap-3">
+      <div className="flex flex-wrap gap-2">
         {filters.map((filter) => (
           <button
             key={filter.id}
             onClick={() => onFilterChange(filter.id)}
-            className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border transition-all ${
+            className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border transition-all whitespace-nowrap ${
               currentFilter === filter.id
                 ? `${filter.bgColor} ${filter.borderColor} ${filter.color}`
                 : "bg-secondary/50 border-border text-muted-foreground hover:bg-secondary"
             }`}
           >
-            <filter.icon size={18} />
-            <span className="font-medium">{filter.label}</span>
+            <filter.icon size={16} />
+            <span className="font-medium text-sm">{filter.label}</span>
             <span
-              className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+              className={`px-1.5 py-0.5 rounded-full text-xs font-bold ${
                 currentFilter === filter.id
                   ? `${filter.bgColor} ${filter.color}`
                   : "bg-muted text-muted-foreground"
