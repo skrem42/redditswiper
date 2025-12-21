@@ -15,7 +15,7 @@ try:
 except ImportError:
     stealth_async = None
 
-from config import PROXY_URL, PROXY_ROTATION_URL
+from config import PROXY_URL, PROXY_ROTATION_URL, PROXY_SERVER, PROXY_USER, PROXY_PASS
 import httpx
 
 logger = logging.getLogger(__name__)
@@ -209,10 +209,18 @@ class StealthBrowser:
             "ignore_https_errors": True,
         }
         
-        # Add proxy if configured
-        if self.proxy_url:
+        # Add proxy if configured - Playwright needs auth as separate fields
+        if PROXY_SERVER and PROXY_USER and PROXY_PASS:
+            context_options["proxy"] = {
+                "server": PROXY_SERVER,
+                "username": PROXY_USER,
+                "password": PROXY_PASS,
+            }
+            logger.info(f"[Worker {self.worker_id}] Using proxy: {PROXY_SERVER} (with auth)")
+        elif self.proxy_url:
+            # Fallback: try parsing auth from URL
             context_options["proxy"] = {"server": self.proxy_url}
-            logger.info(f"[Worker {self.worker_id}] Using proxy: {self.proxy_url[:40]}...")
+            logger.info(f"[Worker {self.worker_id}] Using proxy URL: {self.proxy_url[:40]}...")
         
         self.context = await self.browser.new_context(**context_options)
         
@@ -435,17 +443,28 @@ class StealthBrowser:
         url: str, 
         max_retries: int = 3,
         wait_until: str = "domcontentloaded",
+        timeout: int = 30000,
     ) -> bool:
         """Navigate to URL with retry logic."""
         for attempt in range(max_retries):
             try:
+                logger.info(f"[Worker {self.worker_id}] Navigating to {url} (attempt {attempt + 1}/{max_retries})")
                 response = await self.page.goto(
                     url, 
                     wait_until=wait_until,
-                    timeout=30000,
+                    timeout=timeout,
                 )
                 
+                status = response.status if response else 0
+                logger.info(f"[Worker {self.worker_id}] Response status: {status}")
+                
                 if response and response.status == 200:
+                    self.requests_made += 1
+                    self.consecutive_failures = 0
+                    return True
+                
+                # Also accept other success codes
+                if response and 200 <= response.status < 400:
                     self.requests_made += 1
                     self.consecutive_failures = 0
                     return True
@@ -469,13 +488,22 @@ class StealthBrowser:
                 
             except Exception as e:
                 self.consecutive_failures += 1
-                logger.error(f"[Worker {self.worker_id}] Navigation error: {e}")
+                error_type = type(e).__name__
+                logger.error(f"[Worker {self.worker_id}] Navigation error ({error_type}): {e}")
+                
+                # If it's a timeout, it might be a proxy issue
+                if "Timeout" in str(e):
+                    logger.warning(f"[Worker {self.worker_id}] Timeout - proxy might be slow or blocked")
                 
                 if self.consecutive_failures >= 3:
+                    logger.info(f"[Worker {self.worker_id}] 3 consecutive failures, rotating context...")
                     await self.rotate_ip()
                     self.consecutive_failures = 0
                 
-                await asyncio.sleep(10 * (attempt + 1))
+                wait_time = 10 * (attempt + 1)
+                logger.info(f"[Worker {self.worker_id}] Waiting {wait_time}s before retry...")
+                await asyncio.sleep(wait_time)
         
+        logger.error(f"[Worker {self.worker_id}] All retries exhausted for {url}")
         return False
 

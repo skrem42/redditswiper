@@ -22,7 +22,13 @@ PROXY_PORT = os.getenv("PROXY_PORT", "")
 PROXY_USER = os.getenv("PROXY_USER", "")
 PROXY_PASS = os.getenv("PROXY_PASS", "")
 
-# Construct proxy URL
+# Construct proxy server URL (without auth for Playwright)
+if PROXY_HOST and PROXY_PORT:
+    PROXY_SERVER = f"http://{PROXY_HOST}:{PROXY_PORT}"
+else:
+    PROXY_SERVER = ""
+
+# Legacy: Full proxy URL with auth embedded
 if PROXY_HOST and PROXY_PORT and PROXY_USER and PROXY_PASS:
     PROXY_URL = f"http://{PROXY_USER}:{PROXY_PASS}@{PROXY_HOST}:{PROXY_PORT}"
 else:
