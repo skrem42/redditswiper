@@ -152,13 +152,25 @@ class UltraFastScraper:
                     ultra_fast=True,  # Skip mouse movements (they cause crashes in concurrent mode)
                 )
                 
-                await scraper.start()
-                
-                # Scrape the subreddit
-                data = await scraper.scrape_subreddit(subreddit_name)
-                
-                # ALWAYS close browser after scraping (fresh browser next time)
-                await scraper.close()
+                try:
+                    await scraper.start()
+                    
+                    # Scrape the subreddit
+                    data = await scraper.scrape_subreddit(subreddit_name)
+                    
+                except Exception as scrape_error:
+                    # Ensure cleanup happens even on error
+                    try:
+                        await scraper.close()
+                    except:
+                        pass
+                    raise scrape_error
+                finally:
+                    # ALWAYS close browser after scraping (fresh browser next time)
+                    try:
+                        await scraper.close()
+                    except Exception as close_error:
+                        logger.debug(f"Browser close error (already closed?): {close_error}")
                 
                 if data:
                     # Check if data is valid (page rendered properly)

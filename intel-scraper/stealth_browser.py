@@ -238,9 +238,14 @@ class StealthBrowser:
         self.playwright = await async_playwright().start()
         
         # Browser launch args - keep it minimal (too many args trigger detection)
+        # Added stability flags to prevent crashes
         launch_args = [
             "--disable-blink-features=AutomationControlled",
             "--disable-infobars",
+            "--no-sandbox",  # Prevents crashes with proxies
+            "--disable-dev-shm-usage",  # Prevents memory crashes in headless
+            "--disable-gpu",  # Reduces crashes in headless mode
+            "--disable-software-rasterizer",
         ]
         
         self.browser = await self.playwright.chromium.launch(
