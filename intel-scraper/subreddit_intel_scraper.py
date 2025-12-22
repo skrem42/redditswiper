@@ -65,12 +65,14 @@ class SubredditIntelScraper:
         supabase_client: SupabaseClient,
         worker_id: int = None,
         proxy_url: str = None,
-        headless: bool = False,  # H19: Try non-headless to debug content loading
+        headless: bool = False,
+        ultra_fast: bool = False,  # Skip artificial delays for max speed
     ):
         self.supabase = supabase_client
         self.worker_id = worker_id
         self.proxy_url = proxy_url
         self.headless = headless
+        self.ultra_fast = ultra_fast
         
         self.browser: Optional[StealthBrowser] = None
         self.stats = {
@@ -128,11 +130,15 @@ class SubredditIntelScraper:
             
             # Handle NSFW consent dialogs
             await self.browser.handle_nsfw_consent()
-            await asyncio.sleep(1)
             
-            # Human-like behavior - scroll to load sidebar
-            await self.browser.move_mouse_randomly()
-            await self.browser.human_delay(2.0, 3.0)
+            if not self.ultra_fast:
+                # Human-like behavior (skipped in ultra-fast mode)
+                try:
+                    await asyncio.sleep(1)
+                    await self.browser.move_mouse_randomly()
+                    await self.browser.human_delay(2.0, 3.0)
+                except Exception as e:
+                    logger.debug(f"Mouse movement skipped: {e}")
             
             # Wait for content to hydrate
             content_selectors = [
@@ -142,16 +148,23 @@ class SubredditIntelScraper:
             ]
             for sel in content_selectors:
                 try:
-                    await page.wait_for_selector(sel, timeout=10000)
+                    timeout = 5000 if self.ultra_fast else 10000
+                    await page.wait_for_selector(sel, timeout=timeout)
                     break
                 except:
                     continue
             
             # Scroll to trigger lazy loading
             await page.evaluate('window.scrollTo(0, 500)')
-            await asyncio.sleep(2)
+            if not self.ultra_fast:
+                await asyncio.sleep(2)
+            else:
+                await asyncio.sleep(0.5)  # Minimal wait for lazy load
             await page.evaluate('window.scrollTo(0, 0)')
-            await asyncio.sleep(3)
+            if not self.ultra_fast:
+                await asyncio.sleep(3)
+            else:
+                await asyncio.sleep(1)  # Just wait for content to settle
             
             # Debug: Check what HTML we're getting
             html_content = await page.content()

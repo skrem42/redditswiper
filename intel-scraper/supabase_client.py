@@ -72,22 +72,12 @@ class SupabaseClient:
 
     async def get_pending_intel_scrapes(self, limit: int = 50, min_subscribers: int = 5000) -> list[dict]:
         """
-        Get subreddits that need intel scraping.
-        Pulls from subreddit_queue where status=completed (already crawled)
-        and not yet in nsfw_subreddit_intel or needs refresh.
+        Get subreddits for intel scraping.
+        Pulls ALL completed subreddits from subreddit_queue (can scrape/refresh any of them).
         """
         try:
-            # Get all subreddits from intel table
-            intel_result = self.client.table("nsfw_subreddit_intel").select(
-                "subreddit_name"
-            ).execute()
-            
-            scraped_names = set(
-                row["subreddit_name"].lower() 
-                for row in (intel_result.data or [])
-            )
-            
-            # Get completed subreddits from queue that haven't been scraped
+            # Get completed subreddits from queue - scrape ALL of them!
+            # No filtering by already scraped - we can refresh data
             queue_result = self.client.table("subreddit_queue").select(
                 "subreddit_name, subscribers"
             ).eq(
@@ -96,17 +86,10 @@ class SupabaseClient:
                 "subscribers", min_subscribers
             ).order(
                 "subscribers", desc=True
-            ).limit(limit * 3).execute()  # Fetch extra to filter
+            ).limit(limit).execute()
             
-            # Filter out already scraped
-            pending = []
-            for row in (queue_result.data or []):
-                if row["subreddit_name"].lower() not in scraped_names:
-                    pending.append(row)
-                    if len(pending) >= limit:
-                        break
+            return queue_result.data or []
             
-            return pending
         except Exception as e:
             print(f"Error getting pending intel scrapes: {e}")
             return []
@@ -129,5 +112,23 @@ class SupabaseClient:
         except Exception as e:
             print(f"Error getting intel stats: {e}")
             return {"total": 0, "completed": 0, "pending": 0, "failed": 0}
+    
+    async def get_null_intel_scrapes(self, limit: int = 50) -> list[dict]:
+        """
+        Get subreddits that have NULL values for weekly_visitors or weekly_contributions.
+        These need to be re-scraped.
+        """
+        try:
+            # Get subreddits with NULL metrics
+            result = self.client.table("nsfw_subreddit_intel").select(
+                "subreddit_name, weekly_visitors, weekly_contributions"
+            ).or_(
+                "weekly_visitors.is.null,weekly_contributions.is.null"
+            ).limit(limit).execute()
+            
+            return result.data or []
+        except Exception as e:
+            print(f"Error getting null intel scrapes: {e}")
+            return []
 
 

@@ -111,14 +111,33 @@ class StealthBrowser:
     def __init__(
         self,
         proxy_url: str = None,
+        proxy_server: str = None,
+        proxy_username: str = None,
+        proxy_password: str = None,
         worker_id: int = None,
         headless: bool = True,
         use_fixed_fingerprint: bool = True,  # Use consistent fingerprint for session cookies
     ):
-        self.proxy_url = proxy_url or PROXY_URL
+        # Set worker_id FIRST (needed for logging)
         self.worker_id = worker_id or random.randint(1000, 9999)
         self.headless = headless
         self.use_fixed_fingerprint = use_fixed_fingerprint
+        
+        # Support both proxy_url format and separate server/user/pass
+        if proxy_server and proxy_username and proxy_password:
+            self.proxy_server = proxy_server
+            self.proxy_username = proxy_username
+            self.proxy_password = proxy_password
+            self.proxy_url = None
+        elif proxy_url:
+            # Parse proxy URL to extract components
+            self._parse_proxy_url(proxy_url)
+        else:
+            # Use default from config
+            self.proxy_server = PROXY_SERVER
+            self.proxy_username = PROXY_USER
+            self.proxy_password = PROXY_PASS
+            self.proxy_url = PROXY_URL if not (PROXY_SERVER and PROXY_USER and PROXY_PASS) else None
         
         self.playwright = None
         self.browser: Optional[Browser] = None
@@ -135,6 +154,34 @@ class StealthBrowser:
         
         # Extracted cookies (to be saved/refreshed)
         self.extracted_cookies = None
+    
+    def _parse_proxy_url(self, proxy_url: str):
+        """Parse proxy URL into components."""
+        try:
+            # Format: http://username:password@host:port
+            import re
+            match = re.match(r'https?://([^:]+):([^@]+)@([^:]+):(\d+)', proxy_url)
+            if match:
+                self.proxy_username = match.group(1)
+                self.proxy_password = match.group(2)
+                host = match.group(3)
+                port = match.group(4)
+                self.proxy_server = f"http://{host}:{port}"
+                self.proxy_url = None
+                logger.info(f"[Worker {self.worker_id}] Parsed proxy: {host}:{port}")
+            else:
+                # Fallback to using URL as-is
+                self.proxy_server = None
+                self.proxy_username = None
+                self.proxy_password = None
+                self.proxy_url = proxy_url
+                logger.warning(f"[Worker {self.worker_id}] Could not parse proxy URL, using as-is")
+        except Exception as e:
+            logger.error(f"[Worker {self.worker_id}] Error parsing proxy URL: {e}")
+            self.proxy_server = None
+            self.proxy_username = None
+            self.proxy_password = None
+            self.proxy_url = proxy_url
         
     async def __aenter__(self):
         await self.start()
@@ -227,15 +274,15 @@ class StealthBrowser:
         }
         
         # Add proxy if configured - Playwright needs auth as separate fields
-        if PROXY_SERVER and PROXY_USER and PROXY_PASS:
+        if self.proxy_server and self.proxy_username and self.proxy_password:
             context_options["proxy"] = {
-                "server": PROXY_SERVER,
-                "username": PROXY_USER,
-                "password": PROXY_PASS,
+                "server": self.proxy_server,
+                "username": self.proxy_username,
+                "password": self.proxy_password,
             }
-            logger.info(f"[Worker {self.worker_id}] Using proxy: {PROXY_SERVER} (with auth)")
+            logger.info(f"[Worker {self.worker_id}] Using proxy: {self.proxy_server} (with auth)")
         elif self.proxy_url:
-            # Fallback: try parsing auth from URL
+            # Fallback: try using URL as server (less reliable)
             context_options["proxy"] = {"server": self.proxy_url}
             logger.info(f"[Worker {self.worker_id}] Using proxy URL: {self.proxy_url[:40]}...")
         
