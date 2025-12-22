@@ -9,10 +9,22 @@ Standalone Playwright-based scraper that extracts detailed subreddit intelligenc
 
 ## Features
 
-- 🕵️ **Anti-detection**: User agent rotation, fingerprint spoofing, human-like delays
-- 🔄 **Proxy support**: Rotating proxies with automatic IP rotation
-- 📊 **Smart extraction**: Multiple fallback patterns for Reddit's dynamic UI
+- 🕵️ **Minimal stealth approach**: Just enough to avoid detection, without triggering it
+- 🔄 **Proxy support**: Optional rotating proxies with automatic IP rotation
+- 📊 **Smart extraction**: Slot-based extraction from new Reddit's web components
 - 💾 **Supabase integration**: Reads from `subreddit_queue`, writes to `nsfw_subreddit_intel`
+
+## Key Learnings
+
+**Less is more for stealth!** Reddit's anti-bot detection is sophisticated - excessive JavaScript patches and custom headers actually *trigger* detection instead of bypassing it. Our approach:
+
+- ✅ Minimal browser args (just disable automation flags)
+- ✅ Authenticated session cookies for NSFW access
+- ✅ Simple slot selectors (`[slot="weekly-active-users-count"]`)
+- ✅ Human-like delays and scrolling
+- ❌ NO complex fingerprint spoofing (triggers detection)
+- ❌ NO excessive HTTP headers (triggers detection)
+- ❌ NO playwright-stealth library (triggers detection)
 
 ## Deployment
 
@@ -65,4 +77,5 @@ python intel_worker.py
 | < 3% | Moderate | 🟡 Good |
 | < 5% | High | 🟠 Competitive |
 | > 5% | Very High | 🔴 Saturated |
+
 

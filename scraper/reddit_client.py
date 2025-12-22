@@ -35,7 +35,16 @@ class RedditClient:
         self.base_url = REDDIT_BASE_URL
         self.headers = {
             "User-Agent": REDDIT_USER_AGENT,
-            "Accept": "application/json",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.5",
+            "Accept-Encoding": "gzip, deflate, br",
+            "DNT": "1",
+            "Connection": "keep-alive",
+            "Upgrade-Insecure-Requests": "1",
+            "Sec-Fetch-Dest": "document",
+            "Sec-Fetch-Mode": "navigate",
+            "Sec-Fetch-Site": "none",
+            "Cache-Control": "max-age=0",
         }
         self.client: Optional[httpx.AsyncClient] = None
         self.last_request_time = 0
@@ -52,16 +61,21 @@ class RedditClient:
         # Track rate limit rotations
         self.rotation_count = 0
         
-        # Track consecutive 403s (indicates IP block, not just single sub issue)
+        # Track consecutive 403s/empty responses (indicates IP block)
         self.consecutive_403s = 0
-        self.max_403s_before_rotation = 2  # Rotate after 2 consecutive 403s
+        self.max_403s_before_rotation = 1  # Rotate after just 1 empty response (aggressive)
+        self.last_rotation_time = 0  # Track when we last rotated
 
     async def __aenter__(self):
         # Configure proxy if available
         transport = None
         if self.proxy:
-            print(f"[Worker {self.worker_id}] Using rotating proxy: {self.proxy[:40]}...")
+            # Mask password in log
+            proxy_log = self.proxy.split('@')[0][:20] + '...@' + self.proxy.split('@')[1] if '@' in self.proxy else self.proxy[:40]
+            print(f"[Worker {self.worker_id}] ✓ Using rotating proxy: {proxy_log}")
             transport = httpx.AsyncHTTPTransport(proxy=self.proxy)
+        else:
+            print(f"[Worker {self.worker_id}] ⚠️ WARNING: No proxy configured - Reddit will likely block requests!")
         
         self.client = httpx.AsyncClient(
             headers=self.headers,
@@ -69,7 +83,37 @@ class RedditClient:
             follow_redirects=True,
             transport=transport,
         )
+        
+        # Pre-flight check: Try to get a fresh IP if using rotation
+        if self.proxy and PROXY_ROTATION_URL:
+            print(f"[Worker {self.worker_id}] 🔍 Pre-flight: Checking if proxy IP needs rotation...")
+            # Do a quick test to see if IP is blocked
+            test_worked = await self._test_proxy_health()
+            if not test_worked:
+                print(f"[Worker {self.worker_id}] 🚨 Proxy IP appears blocked. Forcing rotation...")
+                await self._rotate_ip()
+        
         return self
+    
+    async def _test_proxy_health(self) -> bool:
+        """Quick test to see if proxy IP is working with Reddit posts endpoint."""
+        try:
+            # Test the POSTS endpoint (not just about), which is what gets blocked
+            test_url = f"{self.base_url}/r/test/new.json?limit=1"
+            response = await self.client.get(test_url, timeout=10.0)
+            if response.status_code == 200:
+                data = response.json()
+                # Check if we actually got posts back (not empty)
+                children = data.get("data", {}).get("children", [])
+                # Proxy is healthy if we got any posts back
+                is_healthy = len(children) > 0
+                if not is_healthy:
+                    print(f"[Worker {self.worker_id}] ⚠️  Health check: Empty response (IP likely blocked)")
+                return is_healthy
+            return False
+        except Exception as e:
+            print(f"[Worker {self.worker_id}] ⚠️  Health check failed: {e}")
+            return False
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         if self.client:
@@ -87,21 +131,70 @@ class RedditClient:
         """
         Call the proxy rotation API to get a new IP address.
         If no rotation API is configured, recreate the HTTP client to force new connection.
+        Handles ProxyEmpire's 3-minute cooldown automatically.
         """
         if PROXY_ROTATION_URL:
-            try:
-                # Use a separate client without proxy to call the rotation API
-                async with httpx.AsyncClient(timeout=30.0) as rotation_client:
-                    print(f"[Worker {self.worker_id}] Rotating proxy IP via API...")
-                    response = await rotation_client.get(PROXY_ROTATION_URL)
-                    if response.status_code == 200:
-                        self.rotation_count += 1
-                        print(f"[Worker {self.worker_id}] ✓ IP rotated successfully (rotation #{self.rotation_count})")
-                        return True
-                    else:
-                        print(f"[Worker {self.worker_id}] ✗ IP rotation failed: {response.status_code}")
-            except Exception as e:
-                print(f"[Worker {self.worker_id}] ✗ IP rotation error: {e}")
+            max_retries = 10
+            retry_count = 0
+            
+            while retry_count < max_retries:
+                try:
+                    # Use a separate client without proxy to call the rotation API
+                    async with httpx.AsyncClient(timeout=30.0) as rotation_client:
+                        if retry_count == 0:
+                            print(f"[Worker {self.worker_id}] 🔄 Rotating proxy IP via API...")
+                        
+                        response = await rotation_client.get(PROXY_ROTATION_URL)
+                        if response.status_code == 200:
+                            data = response.json()
+                            
+                            # Check for success
+                            if data.get("status") == 200 or "error" not in data:
+                                self.rotation_count += 1
+                                self.last_rotation_time = asyncio.get_event_loop().time()
+                                print(f"[Worker {self.worker_id}] ✓ IP rotated successfully (rotation #{self.rotation_count})")
+                                # Wait a bit for new IP to take effect
+                                await asyncio.sleep(5)
+                                return True
+                            
+                            # Handle cooldown (ProxyEmpire: "You may try again in X seconds")
+                            elif "error" in data and "seconds" in str(data["error"]):
+                                error_msg = data["error"]
+                                # Extract wait time from error message
+                                import re
+                                match = re.search(r'(\d+)\s*seconds', error_msg)
+                                if match:
+                                    wait_time = int(match.group(1))
+                                    print(f"[Worker {self.worker_id}] ⏳ Rotation cooldown: {wait_time}s remaining. Waiting...")
+                                    await asyncio.sleep(min(wait_time + 5, 180))  # Cap at 3 minutes
+                                    retry_count += 1
+                                    continue
+                                else:
+                                    print(f"[Worker {self.worker_id}] ⚠️ Cooldown active: {error_msg}")
+                                    await asyncio.sleep(30)
+                                    retry_count += 1
+                                    continue
+                            
+                            # Handle other errors
+                            elif data.get("status") == 429:
+                                print(f"[Worker {self.worker_id}] ⏳ Rate limited. Waiting 30s...")
+                                await asyncio.sleep(30)
+                                retry_count += 1
+                                continue
+                            
+                            else:
+                                print(f"[Worker {self.worker_id}] ✗ Unexpected response: {data}")
+                                break
+                        else:
+                            print(f"[Worker {self.worker_id}] ✗ IP rotation failed: HTTP {response.status_code}")
+                            break
+                            
+                except Exception as e:
+                    print(f"[Worker {self.worker_id}] ✗ IP rotation error: {e}")
+                    break
+            
+            if retry_count >= max_retries:
+                print(f"[Worker {self.worker_id}] ⚠️ Max rotation retries reached")
         
         # No rotation URL OR rotation failed - recreate client to force new connection
         # Many rotating proxies give a new IP on each new connection
@@ -158,7 +251,15 @@ class RedditClient:
             # Success - reset 403 counter
             self.consecutive_403s = 0
             response.raise_for_status()
-            return response.json()
+            
+            # Parse JSON
+            try:
+                json_data = response.json()
+                return json_data
+            except Exception as e:
+                print(f"[Worker {self.worker_id}] ✗ JSON parse error: {e}")
+                print(f"[Worker {self.worker_id}] Response text: {response.text[:500]}")
+                return None
             
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 429:
@@ -241,6 +342,7 @@ class RedditClient:
             if not data or "data" not in data:
                 self.consecutive_403s += 1
                 print(f"[Worker {self.worker_id}] Empty response for r/{subreddit} (block count: {self.consecutive_403s}/{self.max_403s_before_rotation})")
+                print(f"[Worker {self.worker_id}] DEBUG: data={data}")
                 
                 if self.consecutive_403s >= self.max_403s_before_rotation:
                     print(f"[Worker {self.worker_id}] 🚨 Multiple empty responses - IP likely blocked! Rotating...")

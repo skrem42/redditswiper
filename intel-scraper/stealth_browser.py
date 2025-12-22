@@ -88,23 +88,37 @@ class StealthBrowser:
     A stealth Playwright browser with comprehensive anti-detection measures.
     
     Features:
-    - Random user agent rotation
+    - Consistent fingerprint when using session cookies
     - WebGL fingerprint spoofing
-    - Viewport randomization
     - Proxy support with rotation
     - Human-like behavior simulation
     - NSFW consent handling
+    - Cookie extraction and refresh
     """
+    
+    # Fixed fingerprint for session cookie consistency (matches the session's original browser)
+    FIXED_FINGERPRINT = {
+        "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+        "viewport": {"width": 1920, "height": 1080},
+        "webgl_vendor": "Google Inc. (NVIDIA)",
+        "webgl_renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3070 Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "timezone": "America/New_York",
+        "language": "en-US",
+        "platform": "Win32",
+        "screen": {"width": 1920, "height": 1080, "availWidth": 1920, "availHeight": 1040, "colorDepth": 24, "pixelDepth": 24},
+    }
     
     def __init__(
         self,
         proxy_url: str = None,
         worker_id: int = None,
         headless: bool = True,
+        use_fixed_fingerprint: bool = True,  # Use consistent fingerprint for session cookies
     ):
         self.proxy_url = proxy_url or PROXY_URL
         self.worker_id = worker_id or random.randint(1000, 9999)
         self.headless = headless
+        self.use_fixed_fingerprint = use_fixed_fingerprint
         
         self.playwright = None
         self.browser: Optional[Browser] = None
@@ -119,6 +133,9 @@ class StealthBrowser:
         # Current fingerprint
         self.current_fingerprint = None
         
+        # Extracted cookies (to be saved/refreshed)
+        self.extracted_cookies = None
+        
     async def __aenter__(self):
         await self.start()
         return self
@@ -127,7 +144,13 @@ class StealthBrowser:
         await self.close()
     
     def _generate_fingerprint(self) -> dict:
-        """Generate a random but consistent browser fingerprint."""
+        """Generate a browser fingerprint. Uses fixed fingerprint when session cookies are used for consistency."""
+        # Use fixed fingerprint for session cookie consistency
+        if self.use_fixed_fingerprint:
+            logger.info(f"[Worker {self.worker_id}] Using FIXED fingerprint for session cookie consistency")
+            return self.FIXED_FINGERPRINT.copy()
+        
+        # Random fingerprint for non-session use
         user_agent = random.choice(USER_AGENTS)
         viewport = random.choice(VIEWPORT_SIZES)
         webgl = random.choice(WEBGL_CONFIGS)
@@ -167,16 +190,10 @@ class StealthBrowser:
         
         self.playwright = await async_playwright().start()
         
-        # Browser launch args for stealth
+        # Browser launch args - keep it minimal (too many args trigger detection)
         launch_args = [
             "--disable-blink-features=AutomationControlled",
             "--disable-infobars",
-            "--disable-dev-shm-usage",
-            "--disable-browser-side-navigation",
-            "--disable-gpu",
-            "--no-sandbox",
-            "--disable-setuid-sandbox",
-            f"--window-size={fp['viewport']['width']},{fp['viewport']['height']}",
         ]
         
         self.browser = await self.playwright.chromium.launch(
@@ -224,131 +241,48 @@ class StealthBrowser:
         
         self.context = await self.browser.new_context(**context_options)
         
-        # Apply stealth patches
-        await self._apply_stealth_patches()
-        
-        # Create page
+        # Create page FIRST (before patches to avoid detection)
         self.page = await self.context.new_page()
         
-        # Apply stealth to page if playwright_stealth is available
-        if stealth_async:
-            await stealth_async(self.page)
+        # Apply minimal stealth patches (too much triggers detection)
+        await self._apply_minimal_stealth_patches()
         
-        # Set extra headers
-        await self.page.set_extra_http_headers({
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
-            "Accept-Language": f"{fp['language']},en;q=0.9",
-            "Accept-Encoding": "gzip, deflate, br",
-            "DNT": "1",
-            "Upgrade-Insecure-Requests": "1",
-            "Sec-Fetch-Dest": "document",
-            "Sec-Fetch-Mode": "navigate",
-            "Sec-Fetch-Site": "none",
-            "Sec-Fetch-User": "?1",
-            "Sec-CH-UA": '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
-            "Sec-CH-UA-Mobile": "?0",
-            "Sec-CH-UA-Platform": f'"{fp["platform"]}"',
-        })
+        # #region agent log - Set Reddit session cookies for authenticated access
+        await self.context.add_cookies([
+            # Main session cookie
+            {"name": "reddit_session", "value": "eyJhbGciOiJSUzI1NiIsImtpZCI6IlNIQTI1NjpsVFdYNlFVUEloWktaRG1rR0pVd1gvdWNFK01BSjBYRE12RU1kNzVxTXQ4IiwidHlwIjoiSldUIn0.eyJzdWIiOiJ0Ml8xYW10dDVhcWF5IiwiZXhwIjoxNzgxMDM4MTU0LjcwNjg2NiwiaWF0IjoxNzY1Mzk5NzU0LjcwNjg2NiwianRpIjoidE1SamJDMUxxTmlIZXVpNUhqUUc0WEMwSU12N0FBIiwiYXQiOjEsImNpZCI6ImNvb2tpZSIsImxjYSI6MTcyODY2NDcwNjIwMCwic2NwIjoiZUp5S2pnVUVBQURfX3dFVkFMayIsImZsbyI6MywiYW1yIjpbInNzbyJdfQ.Vt-6-jjxJl24-zFC6CJNcg5UWyRXIH1dIeyaMwFah-Bo2oRznhydO3fe05A8bsov_SBGNetlHsg0M3NkQy7uECc1zBzSwsoCdOWqXlBU-k4b9mU1BtImqMYb4tjvQQP9v0TclRszAhtbmNXfVmihW4VybA8t0_IUHkNrjend_Qj8HghqrcO2OLhNa6Ve5kN49SiYgyHDHGW1oI7P03Tw4-Ylb2GiYMx_Lb8pUfZ9GDLNPeDEPksPde8CldRlHTcBHfOWuMmSJy1GAW1piWGk1dipQeS3KmcpauZ4mVJmBQ0RdGeYJNxb9DjPo1iZNvak-SA-njh9ZlvJ4diwfoTD_Q", "domain": ".reddit.com", "path": "/", "httpOnly": True, "secure": True},
+            # Auth token
+            {"name": "token_v2", "value": "eyJhbGciOiJSUzI1NiIsImtpZCI6IlNIQTI1NjpzS3dsMnlsV0VtMjVmcXhwTU40cWY4MXE2OWFFdWFyMnpLMUdhVGxjdWNZIiwidHlwIjoiSldUIn0.eyJzdWIiOiJ1c2VyIiwiZXhwIjoxNzY2NDMzMjU4Ljk2NzQzOSwiaWF0IjoxNzY2MzQ2ODU4Ljk2NzQzOSwianRpIjoiVGhfLURxcG1sbzFfQ2xiQjlGTFNFU2l2MkMwMHJRIiwiY2lkIjoiMFItV0FNaHVvby1NeVEiLCJsaWQiOiJ0Ml8xYW10dDVhcWF5IiwiYWlkIjoidDJfMWFtdHQ1YXFheSIsImF0IjoxLCJsY2EiOjE3Mjg2NjQ3MDYyMDAsInNjcCI6ImVKeGtrZEdPdERBSWhkLUZhNV9nZjVVX20wMXRjWWFzTFFhb2szbjdEVm9jazcwN2NENHBIUDlES29xRkRDWlhncW5BQkZnVHJUREJSdVQ5bkxtM2cyaU5lOHRZc1puQ0JGbXdGRHJrbUxHc2lRUW1lSklheXhzbW9JTE55Rnl1dEdOTkxUMFFKcWhjTXJlRkhwYzJvYmtiaTU2ZEdGVzVyRHlvc1ZmbDB0akdGTFlueGpjYnF3MnB1QzZuTWtuTFF2a3NYdlRqTjlXMzl2bXpfU2EwSjhPS3F1bUIzaGxKQ0c0c2ZwaW0zZDlUazU2dEN4YTE5M3FRMnVkNjNLNTkxaXcwTzdlZjZfbHJJeG1YWTJoLUp2dDMxeS1oQTQ4OEx6UHFBRWFzNFVjWmRtUWRfbFVIVUxtZ0pHTUo0dE1JNU1ybDIzOEp0bXZUdjhidEV6OThNLUttTl96V0ROUnpDZUxRcF9IMUd3QUFfXzhRMWVUUiIsInJjaWQiOiJVa1N4YzFpYUd4U2kyWXpib18tTGEyekJiNkxUbnpfWldQZmJtSGduRENVIiwiZmxvIjoyfQ.HCWGETGXDzhHNBak87WxdsHCweLACSY0A_U4GwDkstCfuid8vz_9k90f-Gr3Zzj_jKrc0iZXE63y94hpFO4JazxGoTfaQnPGSsawoSvgms5ODHLB89fA4KYb7cBZerOQaM_hVXqlWs3ybf8Z2toC4Cohw1ui7Gc1lDIRqF5IsRWEFYbfb5VKVC9Pxxc--gc4M4V2dgN2Tid4afdO7PgAe-MAidp1e-fyJqbW8hZDfquLpQy4jbIWU9wQAHctl7eMueRuId37LtLDnxB5njPcQAk_c5WOM3ipqU9-bsO6DvYtvW08l3ZS8pLwTnsJcnp4qe6bW7pRmHG6ZE_gD2c6yw", "domain": ".reddit.com", "path": "/", "httpOnly": True, "secure": True},
+            # User ID
+            {"name": "loid", "value": "000000001amtt5aqay.2.1728664706200.Z0FBQUFBQnBKaTJIcktBVVlHSFVxd2RwYW5iYVhTN2NtNnE4OGlwUGwxMlo5NVN4a3d6MFdlRFlNV0liX3VrazNMTlllYUxFMUdDVnFjdWtiN0pGdEg5RHNsRTRaSGNTWlhvWklhQlBWSkJweDQtb3h1dnp0ZHlKR01YUGFMR29HQlRGZ0VCa3l3aUI", "domain": ".reddit.com", "path": "/", "secure": True},
+            # Cookie consent
+            {"name": "eu_cookie", "value": "{%22opted%22:true%2C%22nonessential%22:true}", "domain": "www.reddit.com", "path": "/"},
+            # Theme
+            {"name": "csv", "value": "2", "domain": ".reddit.com", "path": "/", "secure": True},
+            {"name": "edgebucket", "value": "kAjS9mooWgcUQWtVE5", "domain": ".reddit.com", "path": "/", "secure": True},
+        ])
+        logger.info(f"[Worker {self.worker_id}] Set Reddit session cookies (authenticated)")
+        # #endregion
+        
+        # Don't set extra headers - let the browser use defaults
+        # Setting too many custom headers can trigger detection
     
-    async def _apply_stealth_patches(self):
-        """Apply JavaScript patches to evade detection."""
-        fp = self.current_fingerprint
-        
-        # Comprehensive stealth script
-        stealth_script = f"""
-        // Override webdriver detection
-        Object.defineProperty(navigator, 'webdriver', {{
+    async def _apply_minimal_stealth_patches(self):
+        """Apply minimal JavaScript patches - too much triggers detection!"""
+        # MINIMAL patching - Reddit detects excessive modifications
+        minimal_script = """
+        // Only hide webdriver property - nothing else!
+        Object.defineProperty(navigator, 'webdriver', {
             get: () => undefined,
-        }});
+        });
         
-        // Override chrome automation detection
-        window.chrome = {{
-            runtime: {{}},
-            loadTimes: function() {{}},
-            csi: function() {{}},
-            app: {{}},
-        }};
-        
-        // Override plugins (make it look like real Chrome)
-        Object.defineProperty(navigator, 'plugins', {{
-            get: () => [
-                {{ name: 'Chrome PDF Plugin', filename: 'internal-pdf-viewer', description: 'Portable Document Format' }},
-                {{ name: 'Chrome PDF Viewer', filename: 'mhjfbmdgcfjbbpaeojofohoefgiehjai', description: '' }},
-                {{ name: 'Native Client', filename: 'internal-nacl-plugin', description: '' }},
-            ],
-        }});
-        
-        // Override languages
-        Object.defineProperty(navigator, 'languages', {{
-            get: () => ['{fp["language"]}', 'en'],
-        }});
-        
-        // Override platform
-        Object.defineProperty(navigator, 'platform', {{
-            get: () => '{fp["platform"]}',
-        }});
-        
-        // Override hardware concurrency (realistic values)
-        Object.defineProperty(navigator, 'hardwareConcurrency', {{
-            get: () => {random.choice([4, 6, 8, 12, 16])},
-        }});
-        
-        // Override device memory
-        Object.defineProperty(navigator, 'deviceMemory', {{
-            get: () => {random.choice([4, 8, 16, 32])},
-        }});
-        
-        // Override WebGL
-        const getParameterProxy = new Proxy(WebGLRenderingContext.prototype.getParameter, {{
-            apply: function(target, thisArg, args) {{
-                if (args[0] === 37445) {{ // UNMASKED_VENDOR_WEBGL
-                    return '{fp["webgl_vendor"]}';
-                }}
-                if (args[0] === 37446) {{ // UNMASKED_RENDERER_WEBGL
-                    return '{fp["webgl_renderer"]}';
-                }}
-                return Reflect.apply(target, thisArg, args);
-            }}
-        }});
-        WebGLRenderingContext.prototype.getParameter = getParameterProxy;
-        
-        // Also patch WebGL2
-        if (typeof WebGL2RenderingContext !== 'undefined') {{
-            WebGL2RenderingContext.prototype.getParameter = getParameterProxy;
-        }}
-        
-        // Override permissions API
-        const originalQuery = window.navigator.permissions.query;
-        window.navigator.permissions.query = (parameters) => (
-            parameters.name === 'notifications' ?
-                Promise.resolve({{ state: Notification.permission }}) :
-                originalQuery(parameters)
-        );
-        
-        // Override screen properties
-        Object.defineProperty(screen, 'width', {{ get: () => {fp['screen']['width']} }});
-        Object.defineProperty(screen, 'height', {{ get: () => {fp['screen']['height']} }});
-        Object.defineProperty(screen, 'availWidth', {{ get: () => {fp['screen']['availWidth']} }});
-        Object.defineProperty(screen, 'availHeight', {{ get: () => {fp['screen']['availHeight']} }});
-        Object.defineProperty(screen, 'colorDepth', {{ get: () => {fp['screen']['colorDepth']} }});
-        Object.defineProperty(screen, 'pixelDepth', {{ get: () => {fp['screen']['pixelDepth']} }});
-        
-        // Add slight canvas noise for fingerprint randomization
-        const originalToDataURL = HTMLCanvasElement.prototype.toDataURL;
-        HTMLCanvasElement.prototype.toDataURL = function(type) {{
-            if (type === 'image/png' && this.width > 16 && this.height > 16) {{
-                const context = this.getContext('2d');
-                const imageData = context.getImageData(0, 0, this.width, this.height);
-                for (let i = 0; i < imageData.data.length; i += 4) {{
-                    imageData.data[i] = imageData.data[i] + (Math.random() * 0.1 - 0.05);
-                }}
-                context.putImageData(imageData, 0, 0);
-            }}
-            return originalToDataURL.apply(this, arguments);
-        }};
+        // Add minimal chrome object
+        if (!window.chrome) {
+            window.chrome = { runtime: {} };
+        }
         """
         
-        await self.context.add_init_script(stealth_script)
+        await self.page.add_init_script(minimal_script)
     
     async def rotate_ip(self):
         """Rotate the proxy IP address."""
@@ -385,6 +319,9 @@ class StealthBrowser:
     
     async def close(self):
         """Close the browser."""
+        # Extract cookies before closing for future sessions
+        await self.extract_cookies()
+        
         if self.page:
             await self.page.close()
         if self.context:
@@ -394,6 +331,51 @@ class StealthBrowser:
         if self.playwright:
             await self.playwright.stop()
         logger.info(f"[Worker {self.worker_id}] Browser closed")
+    
+    async def extract_cookies(self) -> list:
+        """Extract current cookies from the browser context for future sessions."""
+        if not self.context:
+            return []
+        try:
+            cookies = await self.context.cookies()
+            # Filter for important Reddit cookies
+            important_cookies = [c for c in cookies if c.get('domain', '').endswith('reddit.com')]
+            self.extracted_cookies = important_cookies
+            logger.info(f"[Worker {self.worker_id}] Extracted {len(important_cookies)} Reddit cookies")
+            return important_cookies
+        except Exception as e:
+            logger.warning(f"[Worker {self.worker_id}] Failed to extract cookies: {e}")
+            return []
+    
+    async def verify_logged_in(self) -> bool:
+        """Verify that we're actually logged in to Reddit."""
+        if not self.page:
+            return False
+        try:
+            # Check for logged-in indicators
+            logged_in_selectors = [
+                '[data-testid="user-drawer-button"]',  # User menu button
+                'button[aria-label*="profile"]',
+                '[id*="USER_DROPDOWN"]',
+                'a[href*="/user/"]',
+            ]
+            for selector in logged_in_selectors:
+                el = await self.page.query_selector(selector)
+                if el:
+                    logger.info(f"[Worker {self.worker_id}] ✓ Logged in (found {selector})")
+                    return True
+            
+            # Also check page content for username
+            content = await self.page.content()
+            if 'data-testid="user-drawer-button"' in content or 'petitebbyxoxod' in content.lower():
+                logger.info(f"[Worker {self.worker_id}] ✓ Logged in (found in content)")
+                return True
+            
+            logger.warning(f"[Worker {self.worker_id}] ⚠ Could not verify login status")
+            return False
+        except Exception as e:
+            logger.warning(f"[Worker {self.worker_id}] Login verification failed: {e}")
+            return False
     
     # ==================== Human-Like Behavior ====================
     
@@ -418,9 +400,55 @@ class StealthBrowser:
             await self.page.mouse.move(x, y)
             await asyncio.sleep(random.uniform(0.1, 0.3))
     
+    async def login_reddit(self, username: str, password: str) -> bool:
+        """Log in to Reddit to bypass NSFW age gates."""
+        try:
+            logger.info(f"[Worker {self.worker_id}] Logging in to Reddit...")
+            
+            # Go to login page
+            await self.page.goto("https://www.reddit.com/login", wait_until="domcontentloaded", timeout=30000)
+            await asyncio.sleep(2)
+            
+            # Fill username
+            username_input = await self.page.wait_for_selector('input[name="username"], #loginUsername', timeout=10000)
+            await username_input.fill(username)
+            await asyncio.sleep(0.5)
+            
+            # Fill password
+            password_input = await self.page.wait_for_selector('input[name="password"], #loginPassword', timeout=5000)
+            await password_input.fill(password)
+            await asyncio.sleep(0.5)
+            
+            # Click login button
+            login_button = await self.page.wait_for_selector('button[type="submit"], button:has-text("Log In")', timeout=5000)
+            await login_button.click()
+            
+            # Wait for login to complete
+            await asyncio.sleep(5)
+            
+            # Check if logged in by looking for user menu or logged-in indicators
+            current_url = self.page.url
+            if "login" not in current_url.lower():
+                logger.info(f"[Worker {self.worker_id}] ✓ Reddit login successful")
+                return True
+            else:
+                logger.warning(f"[Worker {self.worker_id}] Login may have failed - still on login page")
+                return False
+                
+        except Exception as e:
+            logger.error(f"[Worker {self.worker_id}] Reddit login failed: {e}")
+            return False
+    
     async def handle_nsfw_consent(self):
         """Click through NSFW/age verification dialogs."""
         consent_selectors = [
+            # New Reddit age gate buttons
+            'button:has-text("Yes, I\'m over 18")',
+            'button:has-text("I\'m 18 or older")',
+            'button:has-text("I am 18 or older")',
+            '[data-testid="over-18-button"]',
+            '[data-testid="mature-content-confirm"]',
+            # Legacy selectors
             'button:has-text("Yes")',
             'button:has-text("Continue")',
             'button:has-text("I am over 18")',
@@ -433,7 +461,7 @@ class StealthBrowser:
         for selector in consent_selectors:
             try:
                 await self.page.click(selector, timeout=2000)
-                logger.debug(f"[Worker {self.worker_id}] Clicked consent: {selector}")
+                logger.info(f"[Worker {self.worker_id}] Clicked consent: {selector}")
                 await asyncio.sleep(0.5)
             except Exception:
                 pass  # Button not found, continue
@@ -442,8 +470,8 @@ class StealthBrowser:
         self, 
         url: str, 
         max_retries: int = 3,
-        wait_until: str = "domcontentloaded",
-        timeout: int = 30000,
+        wait_until: str = "domcontentloaded",  # Wait for DOM to load (faster than networkidle)
+        timeout: int = 30000,  # 30 second timeout
     ) -> bool:
         """Navigate to URL with retry logic."""
         for attempt in range(max_retries):

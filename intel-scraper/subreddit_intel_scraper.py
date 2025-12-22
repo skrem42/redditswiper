@@ -7,25 +7,15 @@ Captures weekly visitors, weekly contributions, rules, and other metadata.
 import asyncio
 import re
 import logging
-import json
 from typing import Optional
 from datetime import datetime
+import httpx
 
 from stealth_browser import StealthBrowser
 from supabase_client import SupabaseClient
 from config import DELAY_MIN, DELAY_MAX, ROTATE_EVERY
 
 logger = logging.getLogger(__name__)
-
-# #region agent log
-DEBUG_LOG_PATH = "/Users/calummelling/Desktop/redditscraper/.cursor/debug.log"
-def debug_log(hypothesis_id, location, message, data=None):
-    import time
-    try:
-        with open(DEBUG_LOG_PATH, "a") as f:
-            f.write(json.dumps({"hypothesisId": hypothesis_id, "location": location, "message": message, "data": data, "timestamp": int(time.time()*1000), "sessionId": "debug-session"}) + "\n")
-    except: pass
-# #endregion
 
 
 def parse_metric_value(text: str) -> Optional[int]:
@@ -75,7 +65,7 @@ class SubredditIntelScraper:
         supabase_client: SupabaseClient,
         worker_id: int = None,
         proxy_url: str = None,
-        headless: bool = True,
+        headless: bool = False,  # H19: Try non-headless to debug content loading
     ):
         self.supabase = supabase_client
         self.worker_id = worker_id
@@ -91,13 +81,16 @@ class SubredditIntelScraper:
         }
     
     async def start(self):
-        """Initialize the stealth browser."""
+        """Initialize the stealth browser and login to Reddit."""
         self.browser = StealthBrowser(
             proxy_url=self.proxy_url,
             worker_id=self.worker_id,
             headless=self.headless,
         )
         await self.browser.start()
+        
+        # Session cookies are set in stealth_browser.py - no login needed
+        logger.info(f"[Worker {self.worker_id}] Using Reddit session cookies")
     
     async def close(self):
         """Close the browser."""
@@ -131,48 +124,88 @@ class SubredditIntelScraper:
                 logger.error(f"[Worker {self.worker_id}] Failed to load r/{subreddit_name}")
                 return None
             
+            page = self.browser.page
+            
             # Handle NSFW consent dialogs
             await self.browser.handle_nsfw_consent()
-            await asyncio.sleep(1)  # Wait for any transitions
+            await asyncio.sleep(1)
             
-            # #region agent log
-            # Check page title and URL after consent
-            page = self.browser.page
-            current_url = page.url
-            title = await page.title()
-            debug_log("H2", "intel_scraper:post_consent", "Page state after consent", {"url": current_url, "title": title})
-            # #endregion
-            
-            # Human-like behavior
+            # Human-like behavior - scroll to load sidebar
             await self.browser.move_mouse_randomly()
-            await self.browser.human_delay(2.0, 4.0)
-            await self.browser.scroll_naturally(2)
+            await self.browser.human_delay(2.0, 3.0)
             
-            # #region agent log
-            # Check if page has expected content structure
-            body_text = await page.evaluate('() => document.body.innerText.substring(0, 2000)')
-            debug_log("H3", "intel_scraper:page_text", "Page body text after scroll", {"text": body_text[:1500] if body_text else "EMPTY"})
-            # #endregion
+            # Wait for content to hydrate
+            content_selectors = [
+                'shreddit-post',
+                '[data-testid="post-container"]',
+                'article',
+            ]
+            for sel in content_selectors:
+                try:
+                    await page.wait_for_selector(sel, timeout=10000)
+                    break
+                except:
+                    continue
+            
+            # Scroll to trigger lazy loading
+            await page.evaluate('window.scrollTo(0, 500)')
+            await asyncio.sleep(2)
+            await page.evaluate('window.scrollTo(0, 0)')
+            await asyncio.sleep(3)
+            
+            # Debug: Check what HTML we're getting
+            html_content = await page.content()
+            html_length = len(html_content)
+            has_shreddit = "shreddit" in html_content.lower()
+            has_posts = "shreddit-post" in html_content.lower()
+            has_sidebar = "subreddit-sidebar" in html_content.lower()
+            logger.info(
+                f"[Worker {self.worker_id}] Page content: {html_length} chars, "
+                f"has_shreddit={has_shreddit}, has_posts={has_posts}, has_sidebar={has_sidebar}"
+            )
+            
+            # Save screenshot and HTML for debugging (only when not headless)
+            if not self.headless:
+                try:
+                    screenshot_path = f"/Users/calummelling/Desktop/redditscraper/intel-scraper/debug_{subreddit_name}.png"
+                    html_path = f"/Users/calummelling/Desktop/redditscraper/intel-scraper/debug_{subreddit_name}.html"
+                    await page.screenshot(path=screenshot_path, full_page=True)
+                    with open(html_path, "w") as f:
+                        f.write(html_content)
+                    logger.info(f"[Worker {self.worker_id}] Debug files saved: {screenshot_path}, {html_path}")
+                except Exception as e:
+                    logger.debug(f"Debug save failed: {e}")
             
             # Extract data from the page
             data = {}
             
-            # Extract weekly visitors
-            data["weekly_visitors"] = await self._extract_weekly_visitors(page)
+            # Get subscriber count from JSON API (reliable method)
+            try:
+                json_url = f"https://www.reddit.com/r/{subreddit_name}/about.json"
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    resp = await client.get(json_url, headers={
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                    })
+                    if resp.status_code == 200:
+                        json_data = resp.json()
+                        if json_data and "data" in json_data:
+                            sub_data = json_data["data"]
+                            if sub_data.get("subscribers"):
+                                data["subscribers"] = sub_data["subscribers"]
+            except Exception as e:
+                logger.debug(f"JSON API fetch failed: {e}")
             
-            # Extract weekly contributions  
+            # Extract weekly visitors and contributions
+            data["weekly_visitors"] = await self._extract_weekly_visitors(page)
             data["weekly_contributions"] = await self._extract_weekly_contributions(page)
             
-            # Extract subscriber count
-            data["subscribers"] = await self._extract_subscribers(page)
+            # Extract subscriber count from page if JSON API failed
+            if not data.get("subscribers"):
+                data["subscribers"] = await self._extract_subscribers(page)
             
-            # Extract description
+            # Extract additional metadata
             data["description"] = await self._extract_description(page)
-            
-            # Extract rules count
             data["rules_count"] = await self._count_rules(page)
-            
-            # Extract community icon
             data["community_icon_url"] = await self._extract_community_icon(page)
             
             # Calculate competition score
@@ -207,89 +240,66 @@ class SubredditIntelScraper:
             return None
     
     async def _extract_weekly_visitors(self, page) -> Optional[int]:
-        """Extract weekly visitors from the sidebar."""
+        """Extract weekly visitors from slot elements."""
         try:
-            content = await page.content()
-            
-            # #region agent log
-            # Log a snippet of the page content around "weekly" to see actual format
-            weekly_idx = content.lower().find('weekly')
-            if weekly_idx > 0:
-                snippet = content[max(0, weekly_idx-200):weekly_idx+300]
-                debug_log("H1", "intel_scraper:weekly_visitors", "Page content around 'weekly'", {"snippet": snippet[:500], "found_at": weekly_idx})
-            else:
-                debug_log("H1", "intel_scraper:weekly_visitors", "No 'weekly' found in page", {"content_len": len(content), "sample": content[:1000]})
-            # #endregion
-            
-            # Look for patterns like "559K\nWeekly visitors" or similar
-            patterns = [
-                r'([\d,\.]+[KMB]?)\s*(?:<[^>]*>)*\s*Weekly visitors',
-                r'<strong[^>]*>(?:<[^>]*>)*([\d,\.]+[KMB]?)(?:</[^>]*>)*</strong>\s*(?:<[^>]*>)*\s*Weekly visitors',
-            ]
-            
-            for pattern in patterns:
-                match = re.search(pattern, content, re.IGNORECASE)
-                # #region agent log
-                debug_log("H1", "intel_scraper:regex_match", f"Pattern match result", {"pattern": pattern[:50], "matched": match is not None, "groups": match.groups() if match else None})
-                # #endregion
-                if match:
-                    value = parse_metric_value(match.group(1))
+            # Method 1: Try Playwright selector for slot element (primary method)
+            try:
+                slot_el = await page.query_selector('[slot="weekly-active-users-count"]')
+                if slot_el:
+                    text = await slot_el.text_content()
+                    value = parse_metric_value(text)
                     if value:
                         return value
+            except:
+                pass
             
-            # Fallback: try to find strong elements near "Weekly visitors"
-            elements = await page.query_selector_all('strong')
-            # #region agent log
-            debug_log("H4", "intel_scraper:strong_elements", f"Found strong elements", {"count": len(elements)})
-            # #endregion
-            for el in elements:
-                text = await el.text_content()
-                if text:
-                    parent = await el.evaluate_handle('el => el.parentElement')
-                    parent_text = await parent.evaluate('el => el.textContent')
-                    if parent_text and 'weekly visitors' in parent_text.lower():
-                        value = parse_metric_value(text)
-                        if value:
-                            return value
+            # Method 2: Regex fallback on page content
+            content = await page.content()
+            slot_match = re.search(r'slot="weekly-active-users-count"[^>]*>([^<]+)<', content)
+            if slot_match:
+                value = parse_metric_value(slot_match.group(1))
+                if value:
+                    return value
             
             return None
             
         except Exception as e:
             logger.debug(f"Error extracting weekly visitors: {e}")
-            # #region agent log
-            debug_log("H1", "intel_scraper:weekly_visitors_error", str(e), {})
-            # #endregion
             return None
     
     async def _extract_weekly_contributions(self, page) -> Optional[int]:
-        """Extract weekly contributions from the sidebar."""
+        """Extract weekly contributions from slot elements."""
         try:
-            content = await page.content()
-            
-            # Look for patterns like "2.2K\nWeekly contributions"
-            patterns = [
-                r'([\d,\.]+[KMB]?)\s*(?:<[^>]*>)*\s*Weekly contributions',
-                r'<strong[^>]*>(?:<[^>]*>)*([\d,\.]+[KMB]?)(?:</[^>]*>)*</strong>\s*(?:<[^>]*>)*\s*Weekly contributions',
+            # Method 1: Try Playwright selectors for slot elements (primary method)
+            slot_selectors = [
+                '[slot="weekly-posts-count"]',
+                '[slot="weekly-contributions-count"]',
+                '[slot="weekly-content-count"]',
             ]
-            
-            for pattern in patterns:
-                match = re.search(pattern, content, re.IGNORECASE)
-                if match:
-                    value = parse_metric_value(match.group(1))
-                    if value:
-                        return value
-            
-            # Fallback: search in elements
-            elements = await page.query_selector_all('strong')
-            for el in elements:
-                text = await el.text_content()
-                if text:
-                    parent = await el.evaluate_handle('el => el.parentElement')
-                    parent_text = await parent.evaluate('el => el.textContent')
-                    if parent_text and 'weekly contributions' in parent_text.lower():
+            for selector in slot_selectors:
+                try:
+                    slot_el = await page.query_selector(selector)
+                    if slot_el:
+                        text = await slot_el.text_content()
                         value = parse_metric_value(text)
                         if value:
                             return value
+                except:
+                    pass
+            
+            # Method 2: Regex fallback on page content
+            content = await page.content()
+            slot_patterns = [
+                r'slot="weekly-posts-count"[^>]*>([^<]+)<',
+                r'slot="weekly-contributions-count"[^>]*>([^<]+)<',
+                r'slot="weekly-content-count"[^>]*>([^<]+)<',
+            ]
+            for slot_pattern in slot_patterns:
+                slot_match = re.search(slot_pattern, content)
+                if slot_match:
+                    value = parse_metric_value(slot_match.group(1))
+                    if value:
+                        return value
             
             return None
             
@@ -298,17 +308,9 @@ class SubredditIntelScraper:
             return None
     
     async def _extract_subscribers(self, page) -> Optional[int]:
-        """Extract subscriber count."""
+        """Extract subscriber count from page content."""
         try:
             content = await page.content()
-            
-            # #region agent log
-            # Search for "members" text to see format
-            members_idx = content.lower().find('members')
-            if members_idx > 0:
-                snippet = content[max(0, members_idx-150):members_idx+100]
-                debug_log("H5", "intel_scraper:subscribers", "Content around 'members'", {"snippet": snippet[:300]})
-            # #endregion
             
             # Look for subscriber patterns
             patterns = [
@@ -318,9 +320,6 @@ class SubredditIntelScraper:
             
             for pattern in patterns:
                 match = re.search(pattern, content, re.IGNORECASE)
-                # #region agent log
-                debug_log("H5", "intel_scraper:sub_pattern", f"Subscriber pattern", {"pattern": pattern[:40], "matched": match is not None, "value": match.group(1) if match else None})
-                # #endregion
                 if match:
                     value = parse_metric_value(match.group(1))
                     if value:

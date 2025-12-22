@@ -10,8 +10,8 @@ load_dotenv()
 # =============================================================================
 # SUPABASE CONFIGURATION
 # =============================================================================
-SUPABASE_URL = os.getenv("SUPABASE_URL", "")
-SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY", "")
+SUPABASE_URL = os.getenv("SUPABASE_URL", "https://jmchmbwhnmlednaycxqh.supabase.co")
+SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImptY2htYndobm1sZWRuYXljeHFoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMzODI4MzYsImV4cCI6MjA3ODk1ODgzNn0.Ux8SqBEj1isHUGIiGh4I-MM54dUb3sd0D7VsRjRKDuU")
 
 # =============================================================================
 # PROXY CONFIGURATION
@@ -36,6 +36,12 @@ else:
 
 # Rotation API URL - called to get a new IP
 PROXY_ROTATION_URL = os.getenv("PROXY_ROTATION_URL", "")
+
+# =============================================================================
+# REDDIT LOGIN (for NSFW access)
+# =============================================================================
+REDDIT_USERNAME = os.getenv("REDDIT_USERNAME", "petitebbyxoxod")
+REDDIT_PASSWORD = os.getenv("REDDIT_PASSWORD", "KyvNzPv@NRYy2@y")
 
 # =============================================================================
 # SCRAPER SETTINGS

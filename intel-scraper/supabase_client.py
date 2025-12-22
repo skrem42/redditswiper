@@ -130,3 +130,4 @@ class SupabaseClient:
             print(f"Error getting intel stats: {e}")
             return {"total": 0, "completed": 0, "pending": 0, "failed": 0}
 
+
