@@ -17,6 +17,14 @@ from config import DELAY_MIN, DELAY_MAX, ROTATE_EVERY
 
 logger = logging.getLogger(__name__)
 
+# Import LLM analyzer for optional analysis
+try:
+    from llm_analyzer import SubredditLLMAnalyzer
+    LLM_AVAILABLE = True
+except ImportError:
+    LLM_AVAILABLE = False
+    logger.warning("LLM analyzer not available - install openai package to enable")
+
 
 def parse_metric_value(text: str) -> Optional[int]:
     """
@@ -67,19 +75,34 @@ class SubredditIntelScraper:
         proxy_url: str = None,
         headless: bool = False,
         ultra_fast: bool = False,  # Skip artificial delays for max speed
+        enable_llm: bool = True,  # Enable LLM analysis after scraping
+        use_session_cookies: bool = True,  # Use hardcoded Reddit session cookies
     ):
         self.supabase = supabase_client
         self.worker_id = worker_id
         self.proxy_url = proxy_url
         self.headless = headless
         self.ultra_fast = ultra_fast
+        self.enable_llm = enable_llm and LLM_AVAILABLE
+        self.use_session_cookies = use_session_cookies
         
         self.browser: Optional[StealthBrowser] = None
+        
+        # Initialize LLM analyzer if available and enabled
+        if self.enable_llm:
+            self.llm_analyzer = SubredditLLMAnalyzer()
+            logger.info(f"[Worker {worker_id}] LLM analysis enabled")
+        else:
+            self.llm_analyzer = None
+            if enable_llm and not LLM_AVAILABLE:
+                logger.warning(f"[Worker {worker_id}] LLM requested but not available")
+        
         self.stats = {
             "subreddits_scraped": 0,
             "successful": 0,
             "failed": 0,
             "ip_rotations": 0,
+            "llm_analyzed": 0,
         }
     
     async def start(self):
@@ -88,6 +111,7 @@ class SubredditIntelScraper:
             proxy_url=self.proxy_url,
             worker_id=self.worker_id,
             headless=self.headless,
+            use_session_cookies=self.use_session_cookies,
         )
         await self.browser.start()
         
@@ -423,6 +447,19 @@ class SubredditIntelScraper:
             logger.debug(f"Error extracting community icon: {e}")
             return None
     
+    async def _fetch_subreddit_rules(self, subreddit_name: str) -> list:
+        """Fetch subreddit rules from Reddit API for LLM analysis."""
+        try:
+            url = f"https://www.reddit.com/r/{subreddit_name}/about/rules.json"
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.get(url)
+                if response.status_code == 200:
+                    data = response.json()
+                    return data.get("rules", [])
+        except Exception as e:
+            logger.debug(f"Could not fetch rules for r/{subreddit_name}: {e}")
+        return []
+    
     async def scrape_batch(
         self,
         subreddits: list[str],
@@ -460,6 +497,38 @@ class SubredditIntelScraper:
             data = await self.scrape_subreddit(subreddit)
             
             if data:
+                # Run LLM analysis if enabled
+                if self.enable_llm and self.llm_analyzer:
+                    try:
+                        logger.info(f"[Worker {self.worker_id}] Running LLM analysis for r/{subreddit}...")
+                        
+                        # Fetch rules and description for LLM
+                        rules_data = await self._fetch_subreddit_rules(subreddit)
+                        
+                        # Use description from scraped data if available
+                        description = data.get("description", "")
+                        subscribers = data.get("subscribers", 0)
+                        
+                        # Analyze with LLM
+                        llm_result = await self.llm_analyzer.analyze_subreddit(
+                            subreddit_name=subreddit,
+                            description=description,
+                            rules=rules_data,
+                            subscribers=subscribers
+                        )
+                        
+                        # Add LLM results to data
+                        data["verification_required"] = llm_result["verification_required"]
+                        data["sellers_allowed"] = llm_result["sellers_allowed"]
+                        data["niche_categories"] = llm_result["niche_categories"]
+                        data["llm_analysis_confidence"] = llm_result["confidence"]
+                        data["llm_analysis_reasoning"] = llm_result["reasoning"]
+                        
+                        self.stats["llm_analyzed"] += 1
+                        logger.info(f"[Worker {self.worker_id}] ✓ LLM: {llm_result['sellers_allowed']} sellers, {llm_result['verification_required']} verification")
+                    except Exception as e:
+                        logger.warning(f"[Worker {self.worker_id}] LLM analysis failed: {e}")
+                
                 results.append(data)
                 # Save to database
                 await self.supabase.upsert_subreddit_intel(data)

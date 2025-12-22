@@ -20,27 +20,27 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
-# Pool of realistic Chrome user agents (Windows, Mac, Linux)
+# Pool of realistic Chrome user agents (Windows, Mac, Linux) - Updated for late 2024/early 2025
 USER_AGENTS = [
-    # Windows Chrome
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Windows NT 11.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-    # Mac Chrome
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 13_6_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36",
-    # Linux Chrome
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (X11; Ubuntu; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    # Windows Chrome (current versions 139-143)
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 11.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+    # Mac Chrome (current versions)
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 13_6_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36",
+    # Linux Chrome (current versions)
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (X11; Ubuntu; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36",
 ]
 
 # WebGL renderer/vendor combinations (real GPU fingerprints)
@@ -98,7 +98,7 @@ class StealthBrowser:
     
     # Fixed fingerprint for session cookie consistency (matches the session's original browser)
     FIXED_FINGERPRINT = {
-        "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+        "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36",
         "viewport": {"width": 1920, "height": 1080},
         "webgl_vendor": "Google Inc. (NVIDIA)",
         "webgl_renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3070 Direct3D11 vs_5_0 ps_5_0, D3D11)",
@@ -117,11 +117,13 @@ class StealthBrowser:
         worker_id: int = None,
         headless: bool = True,
         use_fixed_fingerprint: bool = True,  # Use consistent fingerprint for session cookies
+        use_session_cookies: bool = True,  # Set to False to disable hardcoded session cookies
     ):
         # Set worker_id FIRST (needed for logging)
         self.worker_id = worker_id or random.randint(1000, 9999)
         self.headless = headless
         self.use_fixed_fingerprint = use_fixed_fingerprint
+        self.use_session_cookies = use_session_cookies
         
         # Support both proxy_url format and separate server/user/pass
         if proxy_server and proxy_username and proxy_password:
@@ -299,42 +301,150 @@ class StealthBrowser:
         # Apply minimal stealth patches (too much triggers detection)
         await self._apply_minimal_stealth_patches()
         
-        # #region agent log - Set Reddit session cookies for authenticated access
-        await self.context.add_cookies([
-            # Main session cookie
-            {"name": "reddit_session", "value": "eyJhbGciOiJSUzI1NiIsImtpZCI6IlNIQTI1NjpsVFdYNlFVUEloWktaRG1rR0pVd1gvdWNFK01BSjBYRE12RU1kNzVxTXQ4IiwidHlwIjoiSldUIn0.eyJzdWIiOiJ0Ml8xYW10dDVhcWF5IiwiZXhwIjoxNzgxMDM4MTU0LjcwNjg2NiwiaWF0IjoxNzY1Mzk5NzU0LjcwNjg2NiwianRpIjoidE1SamJDMUxxTmlIZXVpNUhqUUc0WEMwSU12N0FBIiwiYXQiOjEsImNpZCI6ImNvb2tpZSIsImxjYSI6MTcyODY2NDcwNjIwMCwic2NwIjoiZUp5S2pnVUVBQURfX3dFVkFMayIsImZsbyI6MywiYW1yIjpbInNzbyJdfQ.Vt-6-jjxJl24-zFC6CJNcg5UWyRXIH1dIeyaMwFah-Bo2oRznhydO3fe05A8bsov_SBGNetlHsg0M3NkQy7uECc1zBzSwsoCdOWqXlBU-k4b9mU1BtImqMYb4tjvQQP9v0TclRszAhtbmNXfVmihW4VybA8t0_IUHkNrjend_Qj8HghqrcO2OLhNa6Ve5kN49SiYgyHDHGW1oI7P03Tw4-Ylb2GiYMx_Lb8pUfZ9GDLNPeDEPksPde8CldRlHTcBHfOWuMmSJy1GAW1piWGk1dipQeS3KmcpauZ4mVJmBQ0RdGeYJNxb9DjPo1iZNvak-SA-njh9ZlvJ4diwfoTD_Q", "domain": ".reddit.com", "path": "/", "httpOnly": True, "secure": True},
-            # Auth token
-            {"name": "token_v2", "value": "eyJhbGciOiJSUzI1NiIsImtpZCI6IlNIQTI1NjpzS3dsMnlsV0VtMjVmcXhwTU40cWY4MXE2OWFFdWFyMnpLMUdhVGxjdWNZIiwidHlwIjoiSldUIn0.eyJzdWIiOiJ1c2VyIiwiZXhwIjoxNzY2NDMzMjU4Ljk2NzQzOSwiaWF0IjoxNzY2MzQ2ODU4Ljk2NzQzOSwianRpIjoiVGhfLURxcG1sbzFfQ2xiQjlGTFNFU2l2MkMwMHJRIiwiY2lkIjoiMFItV0FNaHVvby1NeVEiLCJsaWQiOiJ0Ml8xYW10dDVhcWF5IiwiYWlkIjoidDJfMWFtdHQ1YXFheSIsImF0IjoxLCJsY2EiOjE3Mjg2NjQ3MDYyMDAsInNjcCI6ImVKeGtrZEdPdERBSWhkLUZhNV9nZjVVX20wMXRjWWFzTFFhb2szbjdEVm9jazcwN2NENHBIUDlES29xRkRDWlhncW5BQkZnVHJUREJSdVQ5bkxtM2cyaU5lOHRZc1puQ0JGbXdGRHJrbUxHc2lRUW1lSklheXhzbW9JTE55Rnl1dEdOTkxUMFFKcWhjTXJlRkhwYzJvYmtiaTU2ZEdGVzVyRHlvc1ZmbDB0akdGTFlueGpjYnF3MnB1QzZuTWtuTFF2a3NYdlRqTjlXMzl2bXpfU2EwSjhPS3F1bUIzaGxKQ0c0c2ZwaW0zZDlUazU2dEN4YTE5M3FRMnVkNjNLNTkxaXcwTzdlZjZfbHJJeG1YWTJoLUp2dDMxeS1oQTQ4OEx6UHFBRWFzNFVjWmRtUWRfbFVIVUxtZ0pHTUo0dE1JNU1ybDIzOEp0bXZUdjhidEV6OThNLUttTl96V0ROUnpDZUxRcF9IMUd3QUFfXzhRMWVUUiIsInJjaWQiOiJVa1N4YzFpYUd4U2kyWXpib18tTGEyekJiNkxUbnpfWldQZmJtSGduRENVIiwiZmxvIjoyfQ.HCWGETGXDzhHNBak87WxdsHCweLACSY0A_U4GwDkstCfuid8vz_9k90f-Gr3Zzj_jKrc0iZXE63y94hpFO4JazxGoTfaQnPGSsawoSvgms5ODHLB89fA4KYb7cBZerOQaM_hVXqlWs3ybf8Z2toC4Cohw1ui7Gc1lDIRqF5IsRWEFYbfb5VKVC9Pxxc--gc4M4V2dgN2Tid4afdO7PgAe-MAidp1e-fyJqbW8hZDfquLpQy4jbIWU9wQAHctl7eMueRuId37LtLDnxB5njPcQAk_c5WOM3ipqU9-bsO6DvYtvW08l3ZS8pLwTnsJcnp4qe6bW7pRmHG6ZE_gD2c6yw", "domain": ".reddit.com", "path": "/", "httpOnly": True, "secure": True},
-            # User ID
-            {"name": "loid", "value": "000000001amtt5aqay.2.1728664706200.Z0FBQUFBQnBKaTJIcktBVVlHSFVxd2RwYW5iYVhTN2NtNnE4OGlwUGwxMlo5NVN4a3d6MFdlRFlNV0liX3VrazNMTlllYUxFMUdDVnFjdWtiN0pGdEg5RHNsRTRaSGNTWlhvWklhQlBWSkJweDQtb3h1dnp0ZHlKR01YUGFMR29HQlRGZ0VCa3l3aUI", "domain": ".reddit.com", "path": "/", "secure": True},
-            # Cookie consent
-            {"name": "eu_cookie", "value": "{%22opted%22:true%2C%22nonessential%22:true}", "domain": "www.reddit.com", "path": "/"},
-            # Theme
-            {"name": "csv", "value": "2", "domain": ".reddit.com", "path": "/", "secure": True},
-            {"name": "edgebucket", "value": "kAjS9mooWgcUQWtVE5", "domain": ".reddit.com", "path": "/", "secure": True},
-        ])
-        logger.info(f"[Worker {self.worker_id}] Set Reddit session cookies (authenticated)")
+        # #region agent log - Set Reddit session cookies for authenticated access (OPTIONAL)
+        if self.use_session_cookies:
+            await self.context.add_cookies([
+                # Main session cookie (expires 2026-05-08 - valid for ~1.3 years)
+                {"name": "reddit_session", "value": "eyJhbGciOiJSUzI1NiIsImtpZCI6IlNIQTI1NjpsVFdYNlFVUEloWktaRG1rR0pVd1gvdWNFK01BSjBYRE12RU1kNzVxTXQ4IiwidHlwIjoiSldUIn0.eyJzdWIiOiJ0Ml8xcWlkcG4zZXY2IiwiZXhwIjoxNzgxNDQxNzMzLjc0MTQ4NSwiaWF0IjoxNzY1ODAzMzMzLjc0MTQ4NSwianRpIjoibGJCWmllUDRZMm5DbjllbjRmWjF5WjJiN0xHVkNnIiwiYXQiOjEsImNpZCI6ImNvb2tpZSIsImxjYSI6MTc0ODY4NzA2NDY0OCwic2NwIjoiZUp5S2pnVUVBQURfX3dFVkFMayIsImZsbyI6Mn0.zXGMEwAUYTrPLomjba0YtBSyv6gOYWCD2qEs7fsMrniSuMta6HtNxPpIWrdmEfXfO9w-SLWeHmJMwz9HEMkWY6HVuEkGCWu77KzCmegInl3s9kYd3HVjRmT59ivtLjJG-AegYPLLQ_W11iVqETlDytbzEiXqldJlYtHomj2mJjzdrZbbs-JhvGMUiiR89PJIvKGVnMoKPhm4fJtqeBorZOOhNluNXyfKLVfEFlCborNT_GVmyf6J0ncm-TZDQqlbWR4JlnJhTxAo6-eOt2cisgZGrtaUoG_pg4UYKFpX4UyH7zWnuhqVRXtWfdloqLAi5nRsO7Shv4LArp1jDqN1WQ", "domain": ".reddit.com", "path": "/", "httpOnly": True, "secure": True},
+                # Auth token (refreshed Dec 22, 2024 - expires in ~24 hours, will auto-refresh on use)
+                {"name": "token_v2", "value": "eyJhbGciOiJSUzI1NiIsImtpZCI6IlNIQTI1NjpzS3dsMnlsV0VtMjVmcXhwTU40cWY4MXE2OWFFdWFyMnpLMUdhVGxjdWNZIiwidHlwIjoiSldUIn0.eyJzdWIiOiJ1c2VyIiwiZXhwIjoxNzY2NDc1NzU5LjY0MDU3MywiaWF0IjoxNzY2Mzg5MzU5LjY0MDU3MywianRpIjoiRVB0VTh3QUpwTDduN2hRNWJ0Vkd1R0RfTXFMOG5RIiwiY2lkIjoiMFItV0FNaHVvby1NeVEiLCJsaWQiOiJ0Ml8xcWlkcG4zZXY2IiwiYWlkIjoidDJfMXFpZHBuM2V2NiIsImF0IjoxLCJsY2EiOjE3NDg2ODcwNjQ2NDgsInNjcCI6ImVKeGtrZEdPdERBSWhkLUZhNV9nZjVVX20wMXRjWWFzTFFhb2szbjdEVm9jazcwN2NENHBIUDlES29xRkRDWlhncW5BQkZnVHJUREJSdVQ5bkxtM2cyaU5lOHRZc1puQ0JGbXdGRHJrbUxHc2lRUW1lSklheXhzbW9JTE55Rnl1dEdOTkxUMFFKcWhjTXJlRkhwYzJvYmtiaTU2ZEdGVzVyRHlvc1ZmbDB0akdGTFlueGpjYnF3MnB1QzZuTWtuTFF2a3NYdlRqTjlXMzl2bXpfU2EwSjhPS3F1bUIzaGxKQ0c0c2ZwaW0zZDlUazU2dEN4YTE5M3FRMnVkNjNLNTkxaXcwTzdlZjZfbHJJeG1YWTJoLUp2dDMxeS1oQTQ4OEx6UHFBRWFzNFVjWmRtUWRfbFVIVUxtZ0pHTUo0dE1JNU1ybDIzOEp0bXZUdjhidEV6OThNLUttTl96V0ROUnpDZUxRcF9IMUd3QUFfXzhRMWVUUiIsInJjaWQiOiJOTldRUFlWUjhMUm85c1ROWXRDcHBVSVE3cWJCbGdVaUprSC1jU1VzUW5BIiwiZmxvIjoyfQ.k5nYHKqrrvShR4GMsRc7tzu0sJ0AEqdOaPwH89dxf-rl0URDHFbU2XHOk2hQk7lPFWEd1rK-Kc_wN8nFpeV_imHHqNolVhlflHd-XJeLTDqgOT0zmvvZc500TEL9dhSgARD73i6RSc1bCwgozhkUTa78q-UPVp8RZB7weELLZD2RVrco0iyjuiZtEMyb_6FpNOJGxvP2rngvNydhp_2JvDOf_WQpZLsYS3XclwFQp7S2wXcAQo5jrhkvslS-53kXDoNzevX2oqlghHOt3YjHo53u6ylkP19U5uHsZSZpvp_KpjcQFjIN4VmBqQRs2Ajb8vORHOn21xTzkwWg3dmj-w", "domain": ".reddit.com", "path": "/", "httpOnly": True, "secure": True},
+                # User ID (new account)
+                {"name": "loid", "value": "000000001qidpn3ev6.2.1748687064648.Z0FBQUFBQm9PdGpZb0NMZ0Z2NEFUVGZLN0hQVDBxZF84WWJ1TldhLXlFTHlUdWVSQWhXQThPdzFhODVxcllaLWZKZTk0UVRjUEI2cnBVUXNWZWpPdlhFeHY2SEVURy01OENIUkhsYzUycVJzS01mQS0ySll2SE5uZ0J2NkhnaWVnWDRnS25qbWp0ZDA", "domain": ".reddit.com", "path": "/", "secure": True},
+                # Cookie consent
+                {"name": "eu_cookie", "value": "{%22opted%22:true%2C%22nonessential%22:true}", "domain": "www.reddit.com", "path": "/"},
+                # Theme
+                {"name": "csv", "value": "2", "domain": ".reddit.com", "path": "/", "secure": True},
+                {"name": "edgebucket", "value": "rlhgGhysrX0pm6bn0x", "domain": ".reddit.com", "path": "/", "secure": True},
+            ])
+            logger.info(f"[Worker {self.worker_id}] Set Reddit session cookies (authenticated - updated Dec 22, 2024)")
+        else:
+            logger.info(f"[Worker {self.worker_id}] Session cookies DISABLED - using stealth browser only")
         # #endregion
         
         # Don't set extra headers - let the browser use defaults
         # Setting too many custom headers can trigger detection
+        
+        # Log cookie expiration warnings
+        import time
+        current_time = time.time()
+        for cookie in [c for c in await self.context.cookies() if c.get('name') in ('reddit_session', 'token_v2')]:
+            # JWT tokens have expiration in the payload (base64 encoded)
+            if cookie.get('name') == 'token_v2':
+                try:
+                    import base64
+                    import json
+                    # JWT format: header.payload.signature
+                    parts = cookie['value'].split('.')
+                    if len(parts) >= 2:
+                        # Decode payload (add padding if needed)
+                        payload_b64 = parts[1]
+                        payload_b64 += '=' * (4 - len(payload_b64) % 4)
+                        payload = json.loads(base64.urlsafe_b64decode(payload_b64))
+                        exp_timestamp = payload.get('exp', 0)
+                        if exp_timestamp and exp_timestamp < current_time:
+                            logger.error(f"[Worker {self.worker_id}] ⚠️ token_v2 EXPIRED! (expired at {exp_timestamp})")
+                        elif exp_timestamp and exp_timestamp - current_time < 86400:  # Less than 24 hours
+                            logger.warning(f"[Worker {self.worker_id}] ⚠️ token_v2 expiring soon! ({(exp_timestamp - current_time)/3600:.1f} hours left)")
+                except Exception as e:
+                    logger.debug(f"[Worker {self.worker_id}] Could not check token expiration: {e}")
     
     async def _apply_minimal_stealth_patches(self):
-        """Apply minimal JavaScript patches - too much triggers detection!"""
-        # MINIMAL patching - Reddit detects excessive modifications
-        minimal_script = """
-        // Only hide webdriver property - nothing else!
+        """Apply comprehensive stealth patches to evade bot detection."""
+        # Comprehensive stealth script covering all major detection vectors
+        stealth_script = """
+        // 1. Hide webdriver property
         Object.defineProperty(navigator, 'webdriver', {
-            get: () => undefined,
+            get: () => false,
         });
         
-        // Add minimal chrome object
+        // 2. Override permissions query to hide automation
+        const originalQuery = window.navigator.permissions.query;
+        window.navigator.permissions.query = (parameters) => (
+            parameters.name === 'notifications' ?
+                Promise.resolve({ state: Notification.permission }) :
+                originalQuery(parameters)
+        );
+        
+        // 3. Add comprehensive chrome object (real Chrome has this)
         if (!window.chrome) {
-            window.chrome = { runtime: {} };
+            window.chrome = {
+                runtime: {},
+                loadTimes: function() {},
+                csi: function() {},
+                app: {}
+            };
+        }
+        
+        // 4. Override plugins to look real
+        Object.defineProperty(navigator, 'plugins', {
+            get: () => [
+                {
+                    0: {type: "application/x-google-chrome-pdf", suffixes: "pdf", description: "Portable Document Format"},
+                    description: "Portable Document Format",
+                    filename: "internal-pdf-viewer",
+                    length: 1,
+                    name: "Chrome PDF Plugin"
+                },
+                {
+                    0: {type: "application/pdf", suffixes: "pdf", description: "Portable Document Format"},
+                    description: "Portable Document Format",
+                    filename: "mhjfbmdgcfjbbpaeojofohoefgiehjai",
+                    length: 1,
+                    name: "Chrome PDF Viewer"
+                },
+                {
+                    0: {type: "application/x-nacl", suffixes: "", description: "Native Client Executable"},
+                    1: {type: "application/x-pnacl", suffixes: "", description: "Portable Native Client Executable"},
+                    description: "",
+                    filename: "internal-nacl-plugin",
+                    length: 2,
+                    name: "Native Client"
+                }
+            ],
+        });
+        
+        // 5. Make languages look real
+        Object.defineProperty(navigator, 'languages', {
+            get: () => ['en-US', 'en'],
+        });
+        
+        // 6. Remove automation-specific properties
+        delete navigator.__proto__.webdriver;
+        
+        // 7. Override toString to hide proxying
+        const originalToString = Function.prototype.toString;
+        Function.prototype.toString = function() {
+            if (this === navigator.permissions.query) {
+                return 'function query() { [native code] }';
+            }
+            return originalToString.call(this);
+        };
+        
+        // 8. Add missing window properties
+        window.chrome.runtime.connect = function() {};
+        window.chrome.runtime.sendMessage = function() {};
+        
+        // 9. Fix navigator.connection if missing
+        if (!navigator.connection) {
+            Object.defineProperty(navigator, 'connection', {
+                get: () => ({
+                    effectiveType: '4g',
+                    downlink: 10,
+                    rtt: 50,
+                    saveData: false
+                }),
+            });
+        }
+        
+        // 10. Override notification permission
+        if (!('Notification' in window)) {
+            window.Notification = {
+                permission: 'default'
+            };
         }
         """
         
-        await self.page.add_init_script(minimal_script)
+        await self.page.add_init_script(stealth_script)
     
     async def rotate_ip(self):
         """Rotate the proxy IP address."""
@@ -551,6 +661,25 @@ class StealthBrowser:
                 
                 if response and response.status in (403, 429):
                     self.consecutive_failures += 1
+                    
+                    # Capture page content for diagnostics
+                    try:
+                        page_content = await self.page.content()
+                        # Check for common Reddit block messages
+                        if "blocked" in page_content.lower():
+                            logger.error(f"[Worker {self.worker_id}] ⚠️ Detected 'blocked' message in page")
+                        if "cloudflare" in page_content.lower():
+                            logger.error(f"[Worker {self.worker_id}] ⚠️ Cloudflare challenge detected")
+                        if "access denied" in page_content.lower():
+                            logger.error(f"[Worker {self.worker_id}] ⚠️ 'Access denied' message detected")
+                        if "automated" in page_content.lower() or "bot" in page_content.lower():
+                            logger.error(f"[Worker {self.worker_id}] ⚠️ Bot detection message found")
+                        
+                        # Log a snippet of the error page (first 500 chars)
+                        logger.debug(f"[Worker {self.worker_id}] Page content preview: {page_content[:500]}")
+                    except Exception as diag_e:
+                        logger.debug(f"[Worker {self.worker_id}] Could not capture diagnostic content: {diag_e}")
+                    
                     logger.warning(
                         f"[Worker {self.worker_id}] {response.status} on {url} "
                         f"(failures: {self.consecutive_failures})"

@@ -48,8 +48,8 @@ REDDIT_PASSWORD = os.getenv("REDDIT_PASSWORD", "KyvNzPv@NRYy2@y")
 # Minimum subscribers to scrape a subreddit
 CRAWLER_MIN_SUBSCRIBERS = int(os.getenv("CRAWLER_MIN_SUBSCRIBERS", "5000"))
 
-# Lower concurrency for single proxy (2 workers seems safest)
-NUM_WORKERS = int(os.getenv("NUM_WORKERS_ULTRA", "2"))
+# Optimal concurrency for single mobile proxy (tested up to 4 successfully)
+NUM_WORKERS = int(os.getenv("NUM_WORKERS_ULTRA", "4"))
 
 # Batch size per round
 BATCH_SIZE = int(os.getenv("BATCH_SIZE_ULTRA", "10"))

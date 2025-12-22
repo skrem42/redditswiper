@@ -2,11 +2,14 @@
 Supabase client for Intel Scraper.
 Handles reading from subreddit_queue and writing to nsfw_subreddit_intel.
 """
+import logging
 from datetime import datetime
 from typing import Optional
 from supabase import create_client, Client
 
 from config import SUPABASE_URL, SUPABASE_ANON_KEY
+
+logger = logging.getLogger(__name__)
 
 
 class SupabaseClient:
@@ -73,26 +76,57 @@ class SupabaseClient:
     async def get_pending_intel_scrapes(self, limit: int = 50, min_subscribers: int = 5000) -> list[dict]:
         """
         Get subreddits for intel scraping.
-        Pulls ALL completed subreddits from subreddit_queue (can scrape/refresh any of them).
+        Returns ANY subreddits from queue (any status) that are NOT yet in intel table.
+        Uses SQL-based filtering for efficiency.
         """
         try:
-            # Get completed subreddits from queue - scrape ALL of them!
-            # No filtering by already scraped - we can refresh data
-            queue_result = self.client.table("subreddit_queue").select(
-                "subreddit_name, subscribers"
-            ).eq(
-                "status", "completed"
-            ).gte(
-                "subscribers", min_subscribers
-            ).order(
-                "subscribers", desc=True
-            ).limit(limit).execute()
+            # Use RPC function to get subreddits not in intel table
+            # This is much more efficient than client-side filtering
+            result = self.client.rpc(
+                "get_subreddits_not_in_intel",
+                {
+                    "p_limit": limit,
+                    "p_min_subscribers": min_subscribers
+                }
+            ).execute()
             
-            return queue_result.data or []
+            return result.data or []
             
         except Exception as e:
-            print(f"Error getting pending intel scrapes: {e}")
-            return []
+            # Fallback to client-side filtering if RPC fails
+            logger.warning(f"RPC failed, using fallback: {e}")
+            try:
+                # Get subreddits from queue
+                queue_result = self.client.table("subreddit_queue").select(
+                    "subreddit_name, subscribers"
+                ).gte(
+                    "subscribers", min_subscribers
+                ).order(
+                    "subscribers", desc=True
+                ).limit(limit * 20).execute()  # Fetch more to account for filtering
+                
+                # Get already scraped names
+                intel_result = self.client.table("nsfw_subreddit_intel").select(
+                    "subreddit_name"
+                ).execute()
+                
+                scraped_names = set(
+                    row["subreddit_name"].lower() 
+                    for row in (intel_result.data or [])
+                )
+                
+                # Filter out already scraped
+                pending = []
+                for row in (queue_result.data or []):
+                    if row["subreddit_name"].lower() not in scraped_names:
+                        pending.append(row)
+                        if len(pending) >= limit:
+                            break
+                
+                return pending
+            except Exception as e2:
+                logger.error(f"Error getting pending intel scrapes: {e2}")
+                return []
 
     async def get_intel_stats(self) -> dict:
         """Get statistics about the intel table."""

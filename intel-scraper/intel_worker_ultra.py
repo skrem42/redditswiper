@@ -150,6 +150,7 @@ class UltraFastScraper:
                     proxy_url=proxy_config["url"],
                     headless=self.headless,
                     ultra_fast=True,  # Skip mouse movements (they cause crashes in concurrent mode)
+                    enable_llm=True,  # Enable LLM analysis after scraping
                 )
                 
                 try:

@@ -695,6 +695,12 @@ export interface SubredditIntel {
   error_message: string | null;
   created_at: string;
   updated_at: string;
+  // LLM-analyzed fields
+  verification_required: boolean | null;
+  sellers_allowed: "allowed" | "not_allowed" | "unknown" | null;
+  niche_categories: string[] | null;
+  llm_analysis_confidence: "high" | "medium" | "low" | null;
+  llm_analysis_reasoning: string | null;
 }
 
 export interface SubredditIntelFilters {
@@ -703,6 +709,8 @@ export interface SubredditIntelFilters {
   minWeeklyVisitors?: number;
   maxCompetitionScore?: number;
   search?: string;
+  verificationRequired?: boolean;
+  sellersAllowed?: "allowed" | "not_allowed";
   sortBy?: "subscribers" | "weekly_visitors" | "weekly_contributions" | "competition_score";
   sortDesc?: boolean;
 }
@@ -732,6 +740,12 @@ export async function getSubredditIntel(
   }
   if (filters.search) {
     query = query.ilike("subreddit_name", `%${filters.search}%`);
+  }
+  if (filters.verificationRequired !== undefined) {
+    query = query.eq("verification_required", filters.verificationRequired);
+  }
+  if (filters.sellersAllowed) {
+    query = query.eq("sellers_allowed", filters.sellersAllowed);
   }
 
   // Apply sorting
