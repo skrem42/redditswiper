@@ -220,19 +220,24 @@ class RedditClient:
             print(f"[Worker {self.worker_id}] ✗ Client recreation failed: {e}")
             return False
 
-    async def _get_json(self, url: str) -> Optional[dict]:
+    async def _get_json(self, url: str, _retry_count: int = 0, _max_retries: int = 3) -> Optional[dict]:
         """Make a rate-limited GET request and return JSON."""
+        # Check if we've exceeded max retries
+        if _retry_count >= _max_retries:
+            print(f"[Worker {self.worker_id}] ❌ Max retries ({_max_retries}) exceeded for {url}")
+            return None
+        
         await self._rate_limit()
         try:
             response = await self.client.get(url)
             
             # Handle 429 rate limit
             if response.status_code == 429:
-                print(f"[Worker {self.worker_id}] Rate limited (429). Rotating IP and waiting {RATE_LIMIT_WAIT_SECONDS}s...")
+                print(f"[Worker {self.worker_id}] Rate limited (429). Rotating IP and waiting {RATE_LIMIT_WAIT_SECONDS}s... (retry {_retry_count + 1}/{_max_retries})")
                 self.consecutive_403s = 0  # Reset 403 counter
                 await self._rotate_ip()
                 await asyncio.sleep(RATE_LIMIT_WAIT_SECONDS)
-                return await self._get_json(url)
+                return await self._get_json(url, _retry_count=_retry_count + 1, _max_retries=_max_retries)
             
             # Handle 403 forbidden - Reddit IP block
             if response.status_code == 403:
@@ -240,11 +245,11 @@ class RedditClient:
                 print(f"[Worker {self.worker_id}] 403 Forbidden (count: {self.consecutive_403s}/{self.max_403s_before_rotation})")
                 
                 if self.consecutive_403s >= self.max_403s_before_rotation:
-                    print(f"[Worker {self.worker_id}] 🚨 IP appears blocked! Rotating IP and waiting 60s...")
+                    print(f"[Worker {self.worker_id}] 🚨 IP appears blocked! Rotating IP and waiting 60s... (retry {_retry_count + 1}/{_max_retries})")
                     await self._rotate_ip()
                     self.consecutive_403s = 0  # Reset counter after rotation
                     await asyncio.sleep(60)  # Wait longer after 403 block
-                    return await self._get_json(url)  # Retry this request
+                    return await self._get_json(url, _retry_count=_retry_count + 1, _max_retries=_max_retries)  # Retry this request
                 
                 return None  # Return None for first 403, let crawler try next sub
             
@@ -263,20 +268,20 @@ class RedditClient:
             
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 429:
-                print(f"[Worker {self.worker_id}] Rate limited (429 exception). Rotating IP and waiting {RATE_LIMIT_WAIT_SECONDS}s...")
+                print(f"[Worker {self.worker_id}] Rate limited (429 exception). Rotating IP and waiting {RATE_LIMIT_WAIT_SECONDS}s... (retry {_retry_count + 1}/{_max_retries})")
                 self.consecutive_403s = 0
                 await self._rotate_ip()
                 await asyncio.sleep(RATE_LIMIT_WAIT_SECONDS)
-                return await self._get_json(url)
+                return await self._get_json(url, _retry_count=_retry_count + 1, _max_retries=_max_retries)
             if e.response.status_code == 403:
                 self.consecutive_403s += 1
                 print(f"[Worker {self.worker_id}] 403 Forbidden exception (count: {self.consecutive_403s})")
                 if self.consecutive_403s >= self.max_403s_before_rotation:
-                    print(f"[Worker {self.worker_id}] 🚨 IP appears blocked! Rotating IP...")
+                    print(f"[Worker {self.worker_id}] 🚨 IP appears blocked! Rotating IP... (retry {_retry_count + 1}/{_max_retries})")
                     await self._rotate_ip()
                     self.consecutive_403s = 0
                     await asyncio.sleep(60)
-                    return await self._get_json(url)
+                    return await self._get_json(url, _retry_count=_retry_count + 1, _max_retries=_max_retries)
                 return None
             print(f"[Worker {self.worker_id}] HTTP error for {url}: {e}")
             return None
