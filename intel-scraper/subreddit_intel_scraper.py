@@ -140,6 +140,39 @@ class SubredditIntelScraper:
         Returns:
             Dict with scraped data or None if failed
         """
+        # First check if subreddit is banned/private via JSON API
+        try:
+            json_url = f"https://www.reddit.com/r/{subreddit_name}/about.json"
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.get(json_url, headers={
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                })
+                
+                # Check if it's specifically banned (not just any 404/403)
+                if resp.status_code in [404, 403]:
+                    try:
+                        json_data = resp.json()
+                        reason = json_data.get("reason", "")
+                        
+                        if reason == "banned":
+                            logger.warning(f"[Worker {self.worker_id}] r/{subreddit_name} is BANNED - skipping permanently")
+                            await self.supabase.mark_intel_failed(subreddit_name, "Subreddit banned (reason: banned)")
+                            return None
+                        elif reason == "private":
+                            logger.warning(f"[Worker {self.worker_id}] r/{subreddit_name} is PRIVATE - skipping permanently")
+                            await self.supabase.mark_intel_failed(subreddit_name, "Subreddit is private (reason: private)")
+                            return None
+                        else:
+                            # 404/403 but no specific ban/private reason - could be temporary, continue scraping
+                            logger.debug(f"[Worker {self.worker_id}] r/{subreddit_name} returned {resp.status_code} (reason: {reason}) - will try scraping anyway")
+                    except Exception:
+                        # Can't parse JSON response - continue with scraping
+                        logger.debug(f"[Worker {self.worker_id}] Could not parse JSON response for r/{subreddit_name} - continuing with scrape")
+                        
+        except Exception as e:
+            logger.debug(f"[Worker {self.worker_id}] JSON API check failed for r/{subreddit_name}: {e}")
+            # Continue with normal scraping if API check fails
+        
         url = f"https://www.reddit.com/r/{subreddit_name}"
         logger.info(f"[Worker {self.worker_id}] Scraping r/{subreddit_name}...")
         

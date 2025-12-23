@@ -41,10 +41,28 @@ class SupabaseClient:
             return None
 
     async def get_subreddits(self) -> list[dict]:
-        """Get all subreddits."""
+        """Get all subreddits with pagination."""
         try:
-            result = self.client.table("subreddits").select("*").execute()
-            return result.data or []
+            all_data = []
+            page_size = 1000
+            offset = 0
+            
+            while True:
+                result = self.client.table("subreddits").select("*").range(
+                    offset, offset + page_size - 1
+                ).execute()
+                
+                if not result.data or len(result.data) == 0:
+                    break
+                
+                all_data.extend(result.data)
+                
+                if len(result.data) < page_size:
+                    break
+                
+                offset += page_size
+            
+            return all_data
         except Exception as e:
             print(f"Error fetching subreddits: {e}")
             return []
@@ -216,24 +234,31 @@ class SupabaseClient:
     # ==================== Statistics ====================
 
     async def get_stats(self) -> dict:
-        """Get scraping statistics."""
+        """Get scraping statistics using count queries."""
         try:
-            leads = self.client.table("reddit_leads").select("id, status", count="exact").execute()
-            posts = self.client.table("reddit_posts").select("id", count="exact").execute()
-            subreddits = self.client.table("subreddits").select("id", count="exact").execute()
+            # Use head=True to only get counts, not data (much faster)
+            leads = self.client.table("reddit_leads").select("*", count="exact", head=True).execute()
+            posts = self.client.table("reddit_posts").select("*", count="exact", head=True).execute()
+            subreddits = self.client.table("subreddits").select("*", count="exact", head=True).execute()
             
-            # Count by status
-            pending = len([l for l in (leads.data or []) if l.get("status") == "pending"])
-            approved = len([l for l in (leads.data or []) if l.get("status") == "approved"])
-            rejected = len([l for l in (leads.data or []) if l.get("status") == "rejected"])
+            # Count by status using separate queries
+            pending = self.client.table("reddit_leads").select("*", count="exact", head=True).eq(
+                "status", "pending"
+            ).execute()
+            approved = self.client.table("reddit_leads").select("*", count="exact", head=True).eq(
+                "status", "approved"
+            ).execute()
+            rejected = self.client.table("reddit_leads").select("*", count="exact", head=True).eq(
+                "status", "rejected"
+            ).execute()
             
             return {
                 "total_leads": leads.count or 0,
                 "total_posts": posts.count or 0,
                 "total_subreddits": subreddits.count or 0,
-                "pending_leads": pending,
-                "approved_leads": approved,
-                "rejected_leads": rejected,
+                "pending_leads": pending.count or 0,
+                "approved_leads": approved.count or 0,
+                "rejected_leads": rejected.count or 0,
             }
         except Exception as e:
             print(f"Error fetching stats: {e}")
@@ -447,17 +472,29 @@ class SupabaseClient:
             return 0
 
     async def get_queue_stats(self) -> dict:
-        """Get statistics about the crawler queue."""
+        """Get statistics about the crawler queue using count queries."""
         try:
-            result = self.client.table("subreddit_queue").select("status").execute()
-            data = result.data or []
+            # Use count queries instead of fetching all data
+            total = self.client.table("subreddit_queue").select("*", count="exact", head=True).execute()
+            pending = self.client.table("subreddit_queue").select("*", count="exact", head=True).eq(
+                "status", "pending"
+            ).execute()
+            processing = self.client.table("subreddit_queue").select("*", count="exact", head=True).eq(
+                "status", "processing"
+            ).execute()
+            completed = self.client.table("subreddit_queue").select("*", count="exact", head=True).eq(
+                "status", "completed"
+            ).execute()
+            failed = self.client.table("subreddit_queue").select("*", count="exact", head=True).eq(
+                "status", "failed"
+            ).execute()
             
             return {
-                "total": len(data),
-                "pending": len([s for s in data if s["status"] == "pending"]),
-                "processing": len([s for s in data if s["status"] == "processing"]),
-                "completed": len([s for s in data if s["status"] == "completed"]),
-                "failed": len([s for s in data if s["status"] == "failed"]),
+                "total": total.count or 0,
+                "pending": pending.count or 0,
+                "processing": processing.count or 0,
+                "completed": completed.count or 0,
+                "failed": failed.count or 0,
             }
         except Exception as e:
             print(f"Error getting queue stats: {e}")

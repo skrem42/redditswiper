@@ -1,2 +1,9 @@
 [00:00:01.041] Server  LOG     ✓ Ready in 737ms
 [00:00:08.155] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[03:28:47.671] Server  LOG     ✓ Compiled in 1314ms
+[03:31:19.485] Server  LOG     ✓ Compiled in 31ms
+[03:31:19.646] Browser WARN    GoTrueClient@sb-jmchmbwhnmlednaycxqh-auth-token:1 (2.89.0) 2025-12-22T21:14:25.259Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key.
+[03:31:32.451] Server  LOG     ✓ Compiled in 17ms
+[03:31:32.570] Browser WARN    GoTrueClient@sb-jmchmbwhnmlednaycxqh-auth-token:2 (2.89.0) 2025-12-22T21:14:38.217Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key.
+[03:31:40.731] Server  LOG     ✓ Compiled in 94ms
+[03:31:40.934] Browser WARN    GoTrueClient@sb-jmchmbwhnmlednaycxqh-auth-token:3 (2.89.0) 2025-12-22T21:14:46.505Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key.

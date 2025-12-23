@@ -234,7 +234,8 @@ export async function getStats(): Promise<Stats> {
   ] = await Promise.all([
     supabase.from("reddit_leads").select("*", { count: "exact", head: true }),
     supabase.from("reddit_posts").select("*", { count: "exact", head: true }),
-    supabase.from("subreddits").select("*", { count: "exact", head: true }),
+    // Count from nsfw_subreddit_intel (intel-analyzed subs) instead of subreddits table
+    supabase.from("nsfw_subreddit_intel").select("*", { count: "exact", head: true }).eq("scrape_status", "completed"),
     supabase.from("reddit_leads").select("*", { count: "exact", head: true }).eq("status", "pending"),
     supabase.from("reddit_leads").select("*", { count: "exact", head: true }).eq("status", "approved"),
     supabase.from("reddit_leads").select("*", { count: "exact", head: true }).eq("status", "rejected"),
@@ -264,9 +265,8 @@ export interface Subreddit {
 }
 
 export async function getSubreddits(): Promise<Subreddit[]> {
-  // Fetch from subreddit_queue (where crawler puts discovered subs)
-  // Only show completed or processing subs (actively being crawled)
-  // Use pagination to bypass Supabase's PostgREST max_rows limit (default 1000)
+  // Fetch from nsfw_subreddit_intel (where intel worker puts analyzed subs)
+  // Show all completed intel scrapes with pagination to bypass 1k limit
   const allData: any[] = [];
   const pageSize = 1000;
   let offset = 0;
@@ -274,10 +274,10 @@ export async function getSubreddits(): Promise<Subreddit[]> {
 
   while (hasMore) {
     const { data, error } = await supabase
-      .from("subreddit_queue")
+      .from("nsfw_subreddit_intel")
       .select("*")
-      .in("status", ["completed", "processing"])
-      .order("subscribers", { ascending: false })
+      .eq("scrape_status", "completed")
+      .order("subscribers", { ascending: false, nullsFirst: false })
       .range(offset, offset + pageSize - 1);
 
     if (error) {
@@ -295,16 +295,14 @@ export async function getSubreddits(): Promise<Subreddit[]> {
     }
   }
 
-  // Map subreddit_queue fields to Subreddit interface
-  // Include status as an extra property for active indicator
+  // Map nsfw_subreddit_intel fields to Subreddit interface
   return allData.map(sub => ({
     id: sub.id,
     name: sub.subreddit_name,
-    display_name: `r/${sub.subreddit_name}`,
+    display_name: sub.display_name || `r/${sub.subreddit_name}`,
     subscribers: sub.subscribers || 0,
-    is_nsfw: sub.is_nsfw ?? true,
-    status: sub.status, // Add status for active indicator
-  } as any)); // Cast to any to avoid TS error with extra property
+    is_nsfw: true, // Intel table only has NSFW subs
+  } as any));
 }
 
 export async function getLeadsBySubreddit(
@@ -313,35 +311,54 @@ export async function getLeadsBySubreddit(
   limit = 50,
   offset = 0
 ): Promise<RedditLead[]> {
-  // subredditId is now from subreddit_queue, need to get subreddit_name
-  const { data: queueSub } = await supabase
-    .from("subreddit_queue")
+  // subredditId is now from nsfw_subreddit_intel, need to get subreddit_name
+  const { data: intelSub } = await supabase
+    .from("nsfw_subreddit_intel")
     .select("subreddit_name")
     .eq("id", subredditId)
     .single();
 
-  if (!queueSub) {
+  if (!intelSub) {
     return [];
   }
 
-  const subredditName = queueSub.subreddit_name;
+  const subredditName = intelSub.subreddit_name;
 
-  // Get lead IDs that have posts with this subreddit_name
-  const { data: postData, error: postError } = await supabase
-    .from("reddit_posts")
-    .select("lead_id")
-    .eq("subreddit_name", subredditName);
+  // Get lead IDs that have posts with this subreddit_name (with pagination)
+  const allLeadIds = new Set<string>();
+  let postOffset = 0;
+  const pageSize = 1000;
 
-  if (postError || !postData) {
-    console.error("Error fetching posts:", postError);
+  while (true) {
+    const { data: postData, error: postError } = await supabase
+      .from("reddit_posts")
+      .select("lead_id")
+      .eq("subreddit_name", subredditName)
+      .range(postOffset, postOffset + pageSize - 1);
+
+    if (postError) {
+      console.error("Error fetching posts:", postError);
+      break;
+    }
+
+    if (!postData || postData.length === 0) {
+      break;
+    }
+
+    postData.forEach(p => allLeadIds.add(p.lead_id));
+
+    if (postData.length < pageSize) {
+      break;
+    }
+
+    postOffset += pageSize;
+  }
+
+  if (allLeadIds.size === 0) {
     return [];
   }
 
-  const leadIds = [...new Set(postData.map((p) => p.lead_id))];
-
-  if (leadIds.length === 0) {
-    return [];
-  }
+  const leadIds = Array.from(allLeadIds);
 
   const { data, error } = await supabase
     .from("reddit_leads")
@@ -365,41 +382,78 @@ export async function getSubredditStats(subredditId: string): Promise<{
   rejected: number;
   superliked: number;
 }> {
-  // subredditId is from subreddit_queue, get subreddit_name
-  const { data: queueSub } = await supabase
-    .from("subreddit_queue")
+  // subredditId is from nsfw_subreddit_intel, get subreddit_name
+  const { data: intelSub } = await supabase
+    .from("nsfw_subreddit_intel")
     .select("subreddit_name")
     .eq("id", subredditId)
     .single();
 
-  if (!queueSub) {
+  if (!intelSub) {
     return { pending: 0, approved: 0, rejected: 0, superliked: 0 };
   }
 
-  // Get lead IDs that have posts with this subreddit_name
-  const { data: postData } = await supabase
-    .from("reddit_posts")
-    .select("lead_id")
-    .eq("subreddit_name", queueSub.subreddit_name);
+  // Get lead IDs that have posts with this subreddit_name (with pagination)
+  const allLeadIds = new Set<string>();
+  let offset = 0;
+  const pageSize = 1000;
 
-  const leadIds = [...new Set((postData || []).map((p) => p.lead_id))];
+  while (true) {
+    const { data: postData } = await supabase
+      .from("reddit_posts")
+      .select("lead_id")
+      .eq("subreddit_name", intelSub.subreddit_name)
+      .range(offset, offset + pageSize - 1);
 
-  if (leadIds.length === 0) {
+    if (!postData || postData.length === 0) {
+      break;
+    }
+
+    postData.forEach(p => allLeadIds.add(p.lead_id));
+
+    if (postData.length < pageSize) {
+      break;
+    }
+
+    offset += pageSize;
+  }
+
+  if (allLeadIds.size === 0) {
     return { pending: 0, approved: 0, rejected: 0, superliked: 0 };
   }
 
-  const { data: leads } = await supabase
+  const leadIds = Array.from(allLeadIds);
+
+  // Use count queries instead of fetching all data
+  const pending = await supabase
     .from("reddit_leads")
-    .select("status")
-    .in("id", leadIds);
+    .select("*", { count: "exact", head: true })
+    .in("id", leadIds)
+    .eq("status", "pending");
 
-  const leadsData = leads || [];
+  const approved = await supabase
+    .from("reddit_leads")
+    .select("*", { count: "exact", head: true })
+    .in("id", leadIds)
+    .eq("status", "approved");
+
+  const rejected = await supabase
+    .from("reddit_leads")
+    .select("*", { count: "exact", head: true })
+    .in("id", leadIds)
+    .eq("status", "rejected");
+
+  const superliked = await supabase
+    .from("reddit_leads")
+    .select("*", { count: "exact", head: true })
+    .in("id", leadIds)
+    .eq("status", "superliked");
 
   return {
-    pending: leadsData.filter((l) => l.status === "pending").length,
-    approved: leadsData.filter((l) => l.status === "approved").length,
-    rejected: leadsData.filter((l) => l.status === "rejected").length,
-    superliked: leadsData.filter((l) => l.status === "superliked").length,
+    pending: pending.count || 0,
+    approved: approved.count || 0,
+    rejected: rejected.count || 0,
+    superliked: superliked.count || 0,
   };
 }
 

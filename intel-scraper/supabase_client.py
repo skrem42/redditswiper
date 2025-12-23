@@ -96,28 +96,61 @@ class SupabaseClient:
             # Fallback to client-side filtering if RPC fails
             logger.warning(f"RPC failed, using fallback: {e}")
             try:
-                # Get subreddits from queue
-                queue_result = self.client.table("subreddit_queue").select(
-                    "subreddit_name, subscribers"
-                ).gte(
-                    "subscribers", min_subscribers
-                ).order(
-                    "subscribers", desc=True
-                ).limit(limit * 20).execute()  # Fetch more to account for filtering
+                # Get ALL subreddits from queue with pagination (not just limit*20)
+                all_queue_subs = []
+                page_size = 1000
+                offset = 0
                 
-                # Get already scraped names
-                intel_result = self.client.table("nsfw_subreddit_intel").select(
-                    "subreddit_name"
-                ).execute()
+                while True:
+                    queue_result = self.client.table("subreddit_queue").select(
+                        "subreddit_name, subscribers"
+                    ).gte(
+                        "subscribers", min_subscribers
+                    ).order(
+                        "subscribers", desc=True
+                    ).range(offset, offset + page_size - 1).execute()
+                    
+                    if not queue_result.data or len(queue_result.data) == 0:
+                        break
+                    
+                    all_queue_subs.extend(queue_result.data)
+                    
+                    if len(queue_result.data) < page_size:
+                        break
+                    
+                    offset += page_size
+                
+                logger.info(f"Fetched {len(all_queue_subs)} subreddits from queue")
+                
+                # Get already scraped names with pagination
+                all_intel_names = []
+                intel_offset = 0
+                
+                while True:
+                    intel_result = self.client.table("nsfw_subreddit_intel").select(
+                        "subreddit_name"
+                    ).range(intel_offset, intel_offset + page_size - 1).execute()
+                    
+                    if not intel_result.data or len(intel_result.data) == 0:
+                        break
+                    
+                    all_intel_names.extend(intel_result.data)
+                    
+                    if len(intel_result.data) < page_size:
+                        break
+                    
+                    intel_offset += page_size
+                
+                logger.info(f"Fetched {len(all_intel_names)} already-scraped subreddits from intel table")
                 
                 scraped_names = set(
                     row["subreddit_name"].lower() 
-                    for row in (intel_result.data or [])
+                    for row in all_intel_names
                 )
                 
                 # Filter out already scraped
                 pending = []
-                for row in (queue_result.data or []):
+                for row in all_queue_subs:
                     if row["subreddit_name"].lower() not in scraped_names:
                         pending.append(row)
                         if len(pending) >= limit:
@@ -129,19 +162,30 @@ class SupabaseClient:
                 return []
 
     async def get_intel_stats(self) -> dict:
-        """Get statistics about the intel table."""
+        """Get statistics about the intel table using count queries."""
         try:
-            result = self.client.table("nsfw_subreddit_intel").select(
-                "scrape_status"
+            # Use count queries instead of fetching all rows
+            total_result = self.client.table("nsfw_subreddit_intel").select(
+                "*", count="exact", head=True
             ).execute()
             
-            data = result.data or []
+            completed_result = self.client.table("nsfw_subreddit_intel").select(
+                "*", count="exact", head=True
+            ).eq("scrape_status", "completed").execute()
+            
+            pending_result = self.client.table("nsfw_subreddit_intel").select(
+                "*", count="exact", head=True
+            ).eq("scrape_status", "pending").execute()
+            
+            failed_result = self.client.table("nsfw_subreddit_intel").select(
+                "*", count="exact", head=True
+            ).eq("scrape_status", "failed").execute()
             
             return {
-                "total": len(data),
-                "completed": len([d for d in data if d.get("scrape_status") == "completed"]),
-                "pending": len([d for d in data if d.get("scrape_status") == "pending"]),
-                "failed": len([d for d in data if d.get("scrape_status") == "failed"]),
+                "total": total_result.count or 0,
+                "completed": completed_result.count or 0,
+                "pending": pending_result.count or 0,
+                "failed": failed_result.count or 0,
             }
         except Exception as e:
             print(f"Error getting intel stats: {e}")
@@ -153,14 +197,29 @@ class SupabaseClient:
         These need to be re-scraped.
         """
         try:
-            # Get subreddits with NULL metrics
-            result = self.client.table("nsfw_subreddit_intel").select(
-                "subreddit_name, weekly_visitors, weekly_contributions"
-            ).or_(
-                "weekly_visitors.is.null,weekly_contributions.is.null"
-            ).limit(limit).execute()
+            # Get subreddits with NULL metrics with proper pagination
+            all_results = []
+            page_size = 1000
+            offset = 0
             
-            return result.data or []
+            while len(all_results) < limit:
+                result = self.client.table("nsfw_subreddit_intel").select(
+                    "subreddit_name, weekly_visitors, weekly_contributions"
+                ).or_(
+                    "weekly_visitors.is.null,weekly_contributions.is.null"
+                ).range(offset, offset + page_size - 1).execute()
+                
+                if not result.data or len(result.data) == 0:
+                    break
+                
+                all_results.extend(result.data)
+                
+                if len(result.data) < page_size or len(all_results) >= limit:
+                    break
+                
+                offset += page_size
+            
+            return all_results[:limit]
         except Exception as e:
             print(f"Error getting null intel scrapes: {e}")
             return []

@@ -79,21 +79,38 @@ export default function Home() {
       const counts: Record<string, number> = {};
       
       for (const sub of data) {
-        const { data: posts } = await supabase
-          .from("reddit_posts")
-          .select("lead_id")
-          .eq("subreddit_name", sub.name); // Use name instead of id
+        // Fetch all posts for this subreddit with pagination (to bypass 1k limit)
+        const allPostLeadIds = new Set<string>();
+        let offset = 0;
+        const pageSize = 1000;
         
-        if (posts) {
-          const leadIds = [...new Set(posts.map((p) => p.lead_id))];
-          if (leadIds.length > 0) {
-            const { data: leads } = await supabase
-              .from("reddit_leads")
-              .select("id")
-              .in("id", leadIds)
-              .eq("status", "pending");
-            counts[sub.id] = leads?.length || 0;
-          }
+        while (true) {
+          const { data: posts } = await supabase
+            .from("reddit_posts")
+            .select("lead_id")
+            .eq("subreddit_name", sub.name)
+            .range(offset, offset + pageSize - 1);
+          
+          if (!posts || posts.length === 0) break;
+          
+          posts.forEach(p => allPostLeadIds.add(p.lead_id));
+          
+          if (posts.length < pageSize) break;
+          offset += pageSize;
+        }
+        
+        if (allPostLeadIds.size > 0) {
+          // Count pending leads for these lead IDs
+          const leadIdsArray = Array.from(allPostLeadIds);
+          
+          // Use count query instead of fetching all leads
+          const { count } = await supabase
+            .from("reddit_leads")
+            .select("*", { count: "exact", head: true })
+            .in("id", leadIdsArray)
+            .eq("status", "pending");
+          
+          counts[sub.id] = count || 0;
         }
       }
       setSubredditPendingCounts(counts);

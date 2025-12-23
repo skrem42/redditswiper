@@ -318,26 +318,26 @@ class UltraFastScraper:
         scrapes_since_rotation = 0
         while True:
             try:
-                # FIRST: Check for NULL entries that need retry (high priority)
-                null_entries = await self.supabase.get_null_intel_scrapes(limit=batch_size)
+                # FIRST: Get pending subreddits (normal queue - prioritize new ones)
+                pending = await self.supabase.get_pending_intel_scrapes(
+                    limit=batch_size,
+                    min_subscribers=self.min_subscribers,
+                )
                 
-                if null_entries:
-                    logger.info(f"🔄 Found {len(null_entries)} subreddits with NULL data - retrying them first!")
-                    subreddits = [s["subreddit_name"] for s in null_entries]
+                if pending:
+                    subreddits = [s["subreddit_name"] for s in pending]
                 else:
-                    # Get pending subreddits (normal queue)
-                    pending = await self.supabase.get_pending_intel_scrapes(
-                        limit=batch_size,
-                        min_subscribers=self.min_subscribers,
-                    )
+                    # If no new pending, check for NULL entries that need retry
+                    null_entries = await self.supabase.get_null_intel_scrapes(limit=batch_size)
                     
-                    if not pending:
+                    if null_entries:
+                        logger.info(f"🔄 No new pending subs - found {len(null_entries)} with NULL data to retry")
+                        subreddits = [s["subreddit_name"] for s in null_entries]
+                    else:
                         logger.info(f"No pending subreddits. Waiting {idle_wait}s...")
                         self._log_stats()
                         await asyncio.sleep(idle_wait)
                         continue
-                    
-                    subreddits = [s["subreddit_name"] for s in pending]
                 
                 logger.info(f"\n📦 Processing batch of {len(subreddits)} subreddits...")
                 
