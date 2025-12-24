@@ -15,7 +15,7 @@ try:
 except ImportError:
     stealth_async = None
 
-from config import PROXY_URL, PROXY_ROTATION_URL, PROXY_SERVER, PROXY_USER, PROXY_PASS
+from config import PROXY_URL, PROXY_ROTATION_URL, PROXY_SERVER, PROXY_USER, PROXY_PASS, PAGE_TIMEOUT_MS
 import httpx
 
 logger = logging.getLogger(__name__)
@@ -156,6 +156,9 @@ class StealthBrowser:
         
         # Extracted cookies (to be saved/refreshed)
         self.extracted_cookies = None
+        
+        # Resource blocking state (for data optimization)
+        self.aggressive_blocking_enabled = False
     
     def _parse_proxy_url(self, proxy_url: str):
         """Parse proxy URL into components."""
@@ -467,6 +470,36 @@ class StealthBrowser:
         await self.new_context()
         return True
     
+    async def enable_aggressive_blocking(self):
+        """
+        Enable aggressive resource blocking to save data usage (up to 80% reduction).
+        Blocks: images, fonts, media, stylesheets.
+        Keeps: document HTML, XHR/fetch for dynamic content, essential scripts.
+        """
+        try:
+            async def block_handler(route):
+                resource_type = route.request.resource_type
+                if resource_type in ["image", "font", "media", "stylesheet"]:
+                    await route.abort()
+                else:
+                    await route.continue_()
+            
+            await self.page.route("**/*", block_handler)
+            self.aggressive_blocking_enabled = True
+            logger.info(f"[Worker {self.worker_id}] ✓ Aggressive resource blocking enabled (saves ~80% data)")
+        except Exception as e:
+            logger.error(f"[Worker {self.worker_id}] Failed to enable resource blocking: {e}")
+            self.aggressive_blocking_enabled = False
+    
+    async def disable_blocking(self):
+        """Disable resource blocking to allow full page rendering."""
+        try:
+            await self.page.unroute("**/*")
+            self.aggressive_blocking_enabled = False
+            logger.info(f"[Worker {self.worker_id}] ✓ Resource blocking disabled (full rendering)")
+        except Exception as e:
+            logger.warning(f"[Worker {self.worker_id}] Failed to disable resource blocking: {e}")
+    
     async def new_context(self):
         """Create a fresh browser context with new fingerprint."""
         if self.page:
@@ -477,6 +510,48 @@ class StealthBrowser:
         self.current_fingerprint = self._generate_fingerprint()
         await self._create_context()
         self.rotation_count += 1
+    
+    async def enable_aggressive_blocking(self):
+        """
+        Enable aggressive resource blocking to save bandwidth (~80-90% savings).
+        Blocks images, fonts, ads, and analytics while keeping HTML/JS needed for scraping.
+        """
+        async def block_resources(route):
+            resource_type = route.request.resource_type
+            url = route.request.url
+            
+            # Block images, media, fonts (biggest data consumers)
+            if resource_type in ["image", "media", "font"]:
+                await route.abort()
+                return
+            
+            # Block stylesheets (we don't need styling for scraping)
+            if resource_type == "stylesheet":
+                await route.abort()
+                return
+            
+            # Block ads and analytics
+            ad_domains = [
+                "doubleclick", "google-analytics", "googletagmanager",
+                "adserver", "ads.", "analytics", "tracking",
+                "pixel", "beacon", "metrics"
+            ]
+            if any(domain in url.lower() for domain in ad_domains):
+                await route.abort()
+                return
+            
+            # Allow everything else (HTML, scripts, XHR for data)
+            await route.continue_()
+        
+        await self.page.route("**/*", block_resources)
+        logger.info(f"[Worker {self.worker_id}] 🚫 Aggressive blocking enabled (images/fonts/ads blocked, saves ~80% data)")
+    
+    async def disable_blocking(self):
+        """
+        Disable resource blocking to load full page (fallback if Reddit detects blocking).
+        """
+        await self.page.unroute("**/*")
+        logger.info(f"[Worker {self.worker_id}] ✅ Resource blocking disabled (full rendering)")
         logger.info(f"[Worker {self.worker_id}] ✓ New context created (#{self.rotation_count})")
     
     async def close(self):
@@ -568,7 +643,7 @@ class StealthBrowser:
             logger.info(f"[Worker {self.worker_id}] Logging in to Reddit...")
             
             # Go to login page
-            await self.page.goto("https://www.reddit.com/login", wait_until="domcontentloaded", timeout=30000)
+            await self.page.goto("https://www.reddit.com/login", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT_MS)
             await asyncio.sleep(2)
             
             # Fill username
@@ -631,11 +706,26 @@ class StealthBrowser:
     async def goto_with_retry(
         self, 
         url: str, 
-        max_retries: int = 3,
+        max_retries: int = 5,  # Increased from 3 for better reliability
         wait_until: str = "domcontentloaded",  # Wait for DOM to load (faster than networkidle)
-        timeout: int = 30000,  # 30 second timeout
+        timeout: int = None,  # Use config default (PAGE_TIMEOUT_MS)
+        use_aggressive_blocking: bool = True,  # Enable data-saving mode by default
     ) -> bool:
-        """Navigate to URL with retry logic."""
+        """
+        Navigate to URL with exponential backoff retry logic and intelligent resource blocking.
+        
+        Strategy:
+        1. First attempt: Use aggressive blocking (saves 80% data)
+        2. If bot detection found: Disable blocking, retry with full rendering
+        3. SOAX provides new IP per retry automatically
+        """
+        if timeout is None:
+            timeout = PAGE_TIMEOUT_MS
+        
+        # Enable aggressive blocking before first attempt (if requested)
+        if use_aggressive_blocking:
+            await self.enable_aggressive_blocking()
+        
         for attempt in range(max_retries):
             try:
                 logger.info(f"[Worker {self.worker_id}] Navigating to {url} (attempt {attempt + 1}/{max_retries})")
@@ -648,49 +738,62 @@ class StealthBrowser:
                 status = response.status if response else 0
                 logger.info(f"[Worker {self.worker_id}] Response status: {status}")
                 
-                if response and response.status == 200:
-                    self.requests_made += 1
-                    self.consecutive_failures = 0
-                    return True
-                
-                # Also accept other success codes
+                # Success case
                 if response and 200 <= response.status < 400:
-                    self.requests_made += 1
-                    self.consecutive_failures = 0
-                    return True
+                    # Check if page is actually loaded (not blocked/empty)
+                    try:
+                        page_content = await self.page.content()
+                        page_text = (await self.page.text_content("body")).lower() if await self.page.query_selector("body") else ""
+                        
+                        # Check for bot detection indicators
+                        bot_indicators = ["blocked", "cloudflare", "automated", "captcha", "suspicious activity"]
+                        is_bot_detected = any(indicator in page_text for indicator in bot_indicators)
+                        is_empty = len(page_text.strip()) < 100
+                        
+                        if is_bot_detected or is_empty:
+                            logger.warning(
+                                f"[Worker {self.worker_id}] ⚠️ Bot detection or empty page "
+                                f"(blocking_enabled={self.aggressive_blocking_enabled})"
+                            )
+                            
+                            # If blocking was enabled, disable it and retry
+                            if self.aggressive_blocking_enabled:
+                                await self.disable_blocking()
+                                logger.info(f"[Worker {self.worker_id}] Retrying with full rendering...")
+                                await asyncio.sleep(3)
+                                continue
+                        
+                        # Success!
+                        self.requests_made += 1
+                        self.consecutive_failures = 0
+                        return True
+                        
+                    except Exception as e:
+                        logger.warning(f"[Worker {self.worker_id}] Content check failed: {e}")
+                        # Assume success if we can't check
+                        self.requests_made += 1
+                        self.consecutive_failures = 0
+                        return True
                 
+                # HTTP error codes
                 if response and response.status in (403, 429):
                     self.consecutive_failures += 1
                     
-                    # Capture page content for diagnostics
-                    try:
-                        page_content = await self.page.content()
-                        # Check for common Reddit block messages
-                        if "blocked" in page_content.lower():
-                            logger.error(f"[Worker {self.worker_id}] ⚠️ Detected 'blocked' message in page")
-                        if "cloudflare" in page_content.lower():
-                            logger.error(f"[Worker {self.worker_id}] ⚠️ Cloudflare challenge detected")
-                        if "access denied" in page_content.lower():
-                            logger.error(f"[Worker {self.worker_id}] ⚠️ 'Access denied' message detected")
-                        if "automated" in page_content.lower() or "bot" in page_content.lower():
-                            logger.error(f"[Worker {self.worker_id}] ⚠️ Bot detection message found")
-                        
-                        # Log a snippet of the error page (first 500 chars)
-                        logger.debug(f"[Worker {self.worker_id}] Page content preview: {page_content[:500]}")
-                    except Exception as diag_e:
-                        logger.debug(f"[Worker {self.worker_id}] Could not capture diagnostic content: {diag_e}")
+                    # Exponential backoff: 5s, 10s, 20s, 40s, 60s (max)
+                    wait_time = min(5 * (2 ** attempt), 60)
                     
                     logger.warning(
-                        f"[Worker {self.worker_id}] {response.status} on {url} "
-                        f"(failures: {self.consecutive_failures})"
+                        f"[Worker {self.worker_id}] HTTP {response.status} on {url}, "
+                        f"retrying in {wait_time}s (SOAX will rotate IP) "
+                        f"[{attempt+1}/{max_retries}]"
                     )
                     
-                    if self.consecutive_failures >= 3:
-                        await self.rotate_ip()
-                        await asyncio.sleep(60)
-                        self.consecutive_failures = 0
-                    else:
-                        await asyncio.sleep(30 * (attempt + 1))
+                    # If blocking was enabled on first 403, try without blocking
+                    if attempt == 0 and self.aggressive_blocking_enabled:
+                        await self.disable_blocking()
+                        logger.info(f"[Worker {self.worker_id}] Disabled blocking, will retry with full rendering")
+                    
+                    await asyncio.sleep(wait_time)
                     continue
                 
                 return True
@@ -698,19 +801,23 @@ class StealthBrowser:
             except Exception as e:
                 self.consecutive_failures += 1
                 error_type = type(e).__name__
-                logger.error(f"[Worker {self.worker_id}] Navigation error ({error_type}): {e}")
                 
-                # If it's a timeout, it might be a proxy issue
+                # Exponential backoff: 5s, 10s, 20s, 40s, 60s (max)
+                wait_time = min(5 * (2 ** attempt), 60)
+                
+                # Check if it's a timeout
                 if "Timeout" in str(e):
-                    logger.warning(f"[Worker {self.worker_id}] Timeout - proxy might be slow or blocked")
+                    logger.warning(
+                        f"[Worker {self.worker_id}] Timeout error: {e}, "
+                        f"retrying in {wait_time}s (SOAX will rotate IP) "
+                        f"[{attempt+1}/{max_retries}]"
+                    )
+                else:
+                    logger.error(
+                        f"[Worker {self.worker_id}] Navigation error ({error_type}): {e}, "
+                        f"retrying in {wait_time}s [{attempt+1}/{max_retries}]"
+                    )
                 
-                if self.consecutive_failures >= 3:
-                    logger.info(f"[Worker {self.worker_id}] 3 consecutive failures, rotating context...")
-                    await self.rotate_ip()
-                    self.consecutive_failures = 0
-                
-                wait_time = 10 * (attempt + 1)
-                logger.info(f"[Worker {self.worker_id}] Waiting {wait_time}s before retry...")
                 await asyncio.sleep(wait_time)
         
         logger.error(f"[Worker {self.worker_id}] All retries exhausted for {url}")

@@ -1,161 +1,163 @@
-# Reddit OnlyFans Lead Scraper
+# Reddit Scraper - Simplified
 
-A complete system for discovering and qualifying OnlyFans creator leads from Reddit. Includes a Python scraper that finds NSFW subreddits, aggregates posts by user, and stores comprehensive profile data in Supabase. The React/Next.js frontend provides a Tinder-style swipe interface for reviewing leads.
+Three independent workers for scraping Reddit NSFW subreddits and creator profiles.
 
-## Architecture
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        Python Scraper                            │
-│  ┌──────────────┐   ┌──────────────┐   ┌──────────────────────┐ │
-│  │  Discover    │ → │ Fetch Posts  │ → │ Group by User &      │ │
-│  │  Subreddits  │   │ via .json    │   │ Fetch Profile Data   │ │
-│  └──────────────┘   └──────────────┘   └──────────────────────┘ │
-└─────────────────────────────┬───────────────────────────────────┘
-                              ↓
-┌─────────────────────────────────────────────────────────────────┐
-│                         Supabase                                 │
-│  ┌──────────────┐ ┌──────────────┐ ┌─────────┐ ┌─────────────┐  │
-│  │ reddit_leads │ │ reddit_posts │ │subreddit│ │lead_decision│  │
-│  └──────────────┘ └──────────────┘ └─────────┘ └─────────────┘  │
-└─────────────────────────────┬───────────────────────────────────┘
-                              ↓
-┌─────────────────────────────────────────────────────────────────┐
-│                     Next.js Frontend                             │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │              Tinder-Style Swipe Interface                 │   │
-│  │  ← Reject                                        Approve →│   │
-│  └──────────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-## Features
-
-### Scraper
-- 🔍 Discovers NSFW subreddits containing "onlyfans" in the name
-- 📊 Fetches posts using Reddit's public `.json` API
-- 👤 Groups posts by user and fetches comprehensive profile data
-- 🔗 Extracts OnlyFans, Linktree, and other platform links
-- 💾 Stores all data in Supabase with proper deduplication
-
-### Frontend
-- 💫 Tinder-style swipe interface with gesture support
-- ⌨️ Keyboard shortcuts (Arrow keys or A/D for swiping)
-- 📸 Content gallery with lightbox for media preview
-- 📈 Stats dashboard showing lead pipeline
-- 🔄 Filter between pending/approved/rejected leads
-
-## Setup
-
-### 1. Environment Variables
-
-**For the Python scraper**, create `scraper/.env`:
+## 🚀 Quick Start
 
 ```bash
-# Supabase Configuration
-SUPABASE_URL=https://jmchmbwhnmlednaycxqh.supabase.co
-SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImptY2htYndobm1sZWRuYXljeHFoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMzODI4MzYsImV4cCI6MjA3ODk1ODgzNn0.Ux8SqBEj1isHUGIiGh4I-MM54dUb3sd0D7VsRjRKDuU
+# Run all workers simultaneously
+python run_all.py
 
-# Scraper Configuration (optional)
-SCRAPE_DELAY_SECONDS=2
-MAX_POSTS_PER_SUBREDDIT=100
-MAX_SUBREDDITS=50
+# Monitor system health (live)
+python monitor.py --watch
+
+# Run individual workers
+python run_all.py --crawler
+python run_all.py --intel
+python run_all.py --llm
 ```
 
-**For the frontend**, create `frontend/.env.local`:
+## System Architecture
 
-```bash
-NEXT_PUBLIC_SUPABASE_URL=https://jmchmbwhnmlednaycxqh.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImptY2htYndobm1sZWRuYXljeHFoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMzODI4MzYsImV4cCI6MjA3ODk1ODgzNn0.Ux8SqBEj1isHUGIiGh4I-MM54dUb3sd0D7VsRjRKDuU
+```
+┌─────────────┐         ┌──────────────┐         ┌──────────────┐
+│   Crawler   │────────▶│ Supabase DB  │────────▶│ Intel Worker │
+│ (Brightdata)│         │    Queue     │         │    (SOAX)    │
+└─────────────┘         └──────────────┘         └──────────────┘
+                               │                         │
+                               │                         ▼
+                               │                  ┌──────────────┐
+                               └─────────────────▶│ LLM Analyzer │
+                                                  │(ProxyEmpire) │
+                                                  └──────────────┘
 ```
 
-Or run with environment variables inline:
+## Workers
 
-```bash
-# Frontend
-cd frontend
-NEXT_PUBLIC_SUPABASE_URL=https://jmchmbwhnmlednaycxqh.supabase.co \
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key \
-npm run dev
-```
+### 1. Crawler (`scraper/`)
+Discovers NSFW subreddits and extracts OnlyFans creator links.
+- **Proxy**: Brightdata residential rotating
+- **Concurrency**: 20 subreddits + 10 users in parallel
+- **Output**: Adds subreddits to Supabase queue, extracts creator profiles
 
-### 2. Python Scraper Setup
-
+**Run**:
 ```bash
 cd scraper
-
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Run the scraper
-python main.py              # Full scrape: discover subs + scrape posts
-python main.py --discover   # Only discover new subreddits
-python main.py --scrape     # Only scrape posts from known subreddits
-python main.py --stats      # Show scraping statistics
+python main.py --crawl --workers 3
 ```
 
-### 3. Frontend Setup
+### 2. Intel Worker (`intel-scraper/`)
+Scrapes detailed subreddit intelligence using headless browser.
+- **Proxy**: SOAX rotating mobile
+- **Accounts**: 10 Reddit accounts for parallel scraping
+- **Concurrency**: 10 browser contexts in parallel
+- **Output**: Subreddit metrics (subscribers, rules, activity)
 
+**Run**:
 ```bash
-cd frontend
-
-# Install dependencies
-npm install
-
-# Run development server
-npm run dev
+cd intel-scraper
+python intel_worker.py
 ```
 
-Open [http://localhost:3000](http://localhost:3000) to access the lead swiper.
+### 3. LLM Analyzer (`intel-scraper/`)
+Analyzes subreddit rules and metadata with GPT-4o-mini.
+- **Reddit API Proxy**: ProxyEmpire mobile
+- **OpenAI API**: Direct connection (no proxy)
+- **Concurrency**: 10 subreddits per batch
+- **Output**: Structured analysis (verification, niche, seller policies)
 
-## Database Schema
+**Run**:
+```bash
+cd intel-scraper
+python run_llm_analysis.py --limit 100
+```
 
-### reddit_leads
-Core lead table with aggregated user data:
-- `reddit_username` - Reddit username
-- `karma` - Total karma (link + comment)
-- `account_created_at` - Account creation date
-- `avatar_url`, `banner_url` - Profile images
-- `total_posts` - Number of posts scraped
-- `posting_frequency` - Posts per day
-- `extracted_links` - Array of OnlyFans/Linktree URLs
-- `bio` - User bio/description
-- `status` - pending/approved/rejected/contacted
+## Configuration
 
-### reddit_posts
-All scraped content:
-- `reddit_post_id` - Reddit's post ID
-- `lead_id` - Foreign key to reddit_leads
-- `title`, `content` - Post text
-- `media_urls` - Array of image/video URLs
-- `upvotes`, `num_comments` - Engagement metrics
-- `subreddit_name` - Source subreddit
+All proxies are hardcoded in config files:
+- **Crawler**: `scraper/config.py`
+- **Intel/LLM**: `intel-scraper/config.py`
 
-### subreddits
-Discovered NSFW subreddits:
-- `name` - Subreddit name
-- `subscribers` - Subscriber count
-- `last_scraped` - Last scrape timestamp
+### Adding Reddit Accounts
 
-### lead_decisions
-Qualification history:
-- `lead_id` - Foreign key to reddit_leads
-- `decision` - approved/rejected
-- `notes` - Optional notes
-- `decided_at` - Decision timestamp
+Edit `intel-scraper/config.py` and add accounts to `REDDIT_ACCOUNTS` list:
 
-## Rate Limiting
+```python
+REDDIT_ACCOUNTS = [
+    {
+        "username": "reddit_account_1",
+        "reddit_session": "eyJ...",  # JWT from browser
+        "token_v2": "eyJ...",         # Auth token from browser
+        "loid": "00000..."            # User ID from browser
+    },
+    # Add 9 more accounts...
+]
+```
 
-Reddit's public JSON API has rate limits. The scraper implements:
-- 2-second delays between requests (configurable)
-- Exponential backoff on 429 (rate limit) errors
-- Caching of subreddit lists to avoid redundant discovery
+**To extract cookies**:
+1. Log into Reddit in browser
+2. Open DevTools → Application → Cookies
+3. Copy values for: `reddit_session`, `token_v2`, `loid`
 
-## License
+### Environment Variables
 
-MIT
+Only required for sensitive keys:
+```bash
+export OPENAI_API_KEY="sk-..."  # For LLM analyzer
+export SUPABASE_URL="https://..."
+export SUPABASE_ANON_KEY="eyJ..."
+```
 
+## File Structure
+
+```
+redditscraper/
+├── scraper/              # Crawler worker
+│   ├── config.py         # Brightdata proxy config
+│   ├── main.py           # Entry point
+│   ├── crawler.py        # Subreddit discovery
+│   ├── reddit_client.py  # HTTP client
+│   └── supabase_client.py
+│
+├── intel-scraper/        # Intel + LLM workers
+│   ├── config.py         # SOAX + ProxyEmpire config
+│   ├── intel_worker.py   # Browser-based scraper
+│   ├── llm_analyzer.py   # GPT-4o-mini analyzer
+│   ├── run_llm_analysis.py # LLM worker entry
+│   ├── stealth_browser.py
+│   ├── account_manager.py # Reddit account pool
+│   └── supabase_client.py
+│
+└── archive/              # Old config/test files
+```
+
+## Monitoring & Utilities
+
+### Check System Status
+```bash
+python check_status.py
+```
+Shows queue state, intel coverage, and health status.
+
+### Retry Failed Subreddits
+```bash
+python retry_failed.py
+```
+Marks failed subreddits as pending for retry.
+
+### Full System Audit
+See `SYSTEM_AUDIT.md` for detailed database analysis and action plan.
+
+## Notes
+
+- **Intel Worker**: Currently configured with 2 accounts, expand to 10 for full parallelism
+- **Proxy Costs**: Brightdata ~$10/GB, SOAX session-based, ProxyEmpire mobile ~$X/GB
+- **LLM Costs**: ~$0.0002 per subreddit analysis with GPT-4o-mini
+- **No env files needed**: All proxies hardcoded for simplicity
+
+## Archived Files
+
+Old test scripts and alternative configs moved to `archive/`:
+- `test_*.py` - Test scripts
+- `config_*.py/sh` - Alternative configurations
+- `convert_cookies.py` - Cookie conversion utilities

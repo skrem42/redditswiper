@@ -1,6 +1,6 @@
 """
 Async Reddit client using public JSON API endpoints.
-Optimized for Brightdata residential rotating proxies - new IP per request.
+Optimized for SOAX rotating proxies - new IP per request.
 
 For parallel processing, create multiple client instances or use the
 provided helper functions for batch operations.
@@ -8,16 +8,18 @@ provided helper functions for batch operations.
 import asyncio
 import re
 import random
+import logging
 from typing import Optional
 from datetime import datetime
 import httpx
+
+logger = logging.getLogger(__name__)
 
 from config import (
     REDDIT_BASE_URL,
     REDDIT_USER_AGENT,
     LINK_PATTERNS,
     PROXY_URL,
-    BRIGHTDATA_PROXY,
     RATE_LIMIT_WAIT_SECONDS,
     MAX_CONCURRENT_REQUESTS,
 )
@@ -27,7 +29,7 @@ class RedditClient:
     """
     Async client for Reddit's public JSON API.
     
-    Optimized for Brightdata residential rotating proxies which provide
+    Optimized for SOAX rotating proxies which provide
     a new IP per request, eliminating the need for manual rotation.
     """
 
@@ -51,10 +53,10 @@ class RedditClient:
         self.client: Optional[httpx.AsyncClient] = None
         self.link_patterns = [re.compile(p, re.IGNORECASE) for p in LINK_PATTERNS]
         
-        # Proxy support - prefer Brightdata, fallback to legacy
-        self.proxy = proxy or BRIGHTDATA_PROXY or PROXY_URL
+        # Proxy support - use SOAX
+        self.proxy = proxy or PROXY_URL
         self.worker_id = worker_id or random.randint(1000, 9999)
-        self.is_brightdata = bool(BRIGHTDATA_PROXY) or (self.proxy and 'brd.superproxy.io' in self.proxy)
+        self.is_soax = self.proxy and 'proxy.soax.com' in self.proxy
         
         # Stats tracking
         self.requests_made = 0
@@ -71,9 +73,9 @@ class RedditClient:
             else:
                 proxy_log = self.proxy[:40]
             
-            proxy_type = "Brightdata (auto-rotating)" if self.is_brightdata else "rotating"
+            proxy_type = "SOAX (auto-rotating)" if self.is_soax else "rotating"
             print(f"[Worker {self.worker_id}] ✓ Using {proxy_type} proxy: {proxy_log}")
-            transport = httpx.AsyncHTTPTransport(proxy=self.proxy)
+            transport = httpx.AsyncHTTPTransport(proxy=self.proxy, verify=False)
         else:
             print(f"[Worker {self.worker_id}] ⚠️ WARNING: No proxy configured!")
         
@@ -82,6 +84,7 @@ class RedditClient:
             timeout=30.0,
             follow_redirects=True,
             transport=transport,
+            verify=False,  # Disable SSL verification for MITM proxies
         )
         
         return self
@@ -90,51 +93,110 @@ class RedditClient:
         if self.client:
             await self.client.aclose()
 
-    async def _get_json(self, url: str, max_retries: int = 3) -> Optional[dict]:
+    async def _get_json(self, url: str, max_retries: int = 5) -> Optional[dict]:
         """
-        Make a GET request and return JSON.
+        Make a GET request and return JSON with exponential backoff.
         
-        With Brightdata, each request gets a new IP, so retries are effective
-        without needing explicit rotation.
+        With SOAX, each request gets a new IP automatically, so retries are effective.
+        Increased retries and exponential backoff for better reliability.
         """
         for attempt in range(max_retries):
             try:
                 response = await self.client.get(url)
                 self.requests_made += 1
                 
-                # Handle rate limit - wait briefly and retry (new IP on retry)
-                if response.status_code == 429:
-                    wait_time = RATE_LIMIT_WAIT_SECONDS * (attempt + 1)
-                    print(f"[Worker {self.worker_id}] Rate limited (429). Waiting {wait_time}s... (attempt {attempt + 1}/{max_retries})")
-                    await asyncio.sleep(wait_time)
-                    continue
-                
-                # Handle 403 forbidden - retry with new IP
-                if response.status_code == 403:
-                    self.consecutive_failures += 1
+                # Handle all retryable error codes with exponential backoff
+                if response.status_code in [429, 403, 502, 503, 504]:
                     if attempt < max_retries - 1:
-                        print(f"[Worker {self.worker_id}] 403 Forbidden. Retrying... (attempt {attempt + 1}/{max_retries})")
-                        await asyncio.sleep(1)
+                        # Exponential backoff: 2s, 4s, 8s, 16s, 30s (max)
+                        wait_time = min(2 ** (attempt + 1), 30)
+                        error_name = {
+                            429: "Rate Limited",
+                            403: "Forbidden", 
+                            502: "Bad Gateway",
+                            503: "Service Unavailable",
+                            504: "Gateway Timeout"
+                        }.get(response.status_code, f"HTTP {response.status_code}")
+                        
+                        logger.warning(
+                            f"[Worker {self.worker_id}] {error_name}, "
+                            f"retrying in {wait_time}s (SOAX will rotate IP) "
+                            f"[{attempt+1}/{max_retries}]"
+                        )
+                        await asyncio.sleep(wait_time)
                         continue
+                    else:
+                        self.requests_failed += 1
+                        logger.error(
+                            f"[Worker {self.worker_id}] ⚠️ HTTP {response.status_code} "
+                            f"persists after {max_retries} attempts - skipping {url}"
+                        )
+                        return None
+                
+                # Handle 402 Payment Required (proxy-specific error)
+                if response.status_code == 402:
+                    self.requests_failed += 1
+                    if attempt < max_retries - 1:
+                        wait_time = min(2 ** (attempt + 1), 30)
+                        logger.warning(
+                            f"[Worker {self.worker_id}] 402 Proxy error, "
+                            f"retrying in {wait_time}s [{attempt+1}/{max_retries}]"
+                        )
+                        await asyncio.sleep(wait_time)
+                        continue
+                    logger.error(f"[Worker {self.worker_id}] ⚠️ 402 error persists - skipping {url}")
                     return None
                 
                 # Success
                 self.consecutive_failures = 0
                 response.raise_for_status()
-                
                 return response.json()
+                
+            except httpx.TimeoutException as e:
+                self.requests_failed += 1
+                if attempt < max_retries - 1:
+                    wait_time = min(2 ** (attempt + 1), 30)
+                    logger.warning(
+                        f"[Worker {self.worker_id}] Timeout error, "
+                        f"retrying in {wait_time}s [{attempt+1}/{max_retries}]"
+                    )
+                    await asyncio.sleep(wait_time)
+                    continue
+                logger.error(f"[Worker {self.worker_id}] Timeout error persists: {url}")
+                return None
+                
+            except httpx.ConnectError as e:
+                self.requests_failed += 1
+                if attempt < max_retries - 1:
+                    wait_time = min(2 ** (attempt + 1), 30)
+                    logger.warning(
+                        f"[Worker {self.worker_id}] Connection error: {e}, "
+                        f"retrying in {wait_time}s [{attempt+1}/{max_retries}]"
+                    )
+                    await asyncio.sleep(wait_time)
+                    continue
+                logger.error(f"[Worker {self.worker_id}] Connection error persists: {url}")
+                return None
                 
             except httpx.HTTPStatusError as e:
                 self.requests_failed += 1
+                # Don't retry on 4xx errors (except those handled above)
+                if 400 <= e.response.status_code < 500 and e.response.status_code not in [402, 403, 429]:
+                    logger.error(f"[Worker {self.worker_id}] HTTP {e.response.status_code} error for {url} - not retrying")
+                    return None
                 if attempt < max_retries - 1:
-                    await asyncio.sleep(1)
+                    wait_time = min(2 ** attempt, 10)
+                    await asyncio.sleep(wait_time)
                     continue
-                print(f"[Worker {self.worker_id}] HTTP error for {url}: {e}")
+                logger.error(f"[Worker {self.worker_id}] HTTP error for {url}: {e}")
                 return None
+                
             except Exception as e:
                 self.requests_failed += 1
                 if attempt < max_retries - 1:
-                    await asyncio.sleep(1)
+                    wait_time = min(2 ** attempt, 10)
+                    logger.warning(f"[Worker {self.worker_id}] Unexpected error: {e}, retrying...")
+                    await asyncio.sleep(wait_time)
                     continue
                 print(f"[Worker {self.worker_id}] Error fetching {url}: {e}")
                 return None

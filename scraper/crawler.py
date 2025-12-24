@@ -22,7 +22,6 @@ from config import (
     CONCURRENT_USERS,
     MAX_CONCURRENT_REQUESTS,
     PROXY_URL,
-    BRIGHTDATA_PROXY,
 )
 
 # Set up logging
@@ -67,8 +66,8 @@ class ParallelSubredditCrawler:
         self.request_semaphore = asyncio.Semaphore(MAX_CONCURRENT_REQUESTS)
         self.user_semaphore = asyncio.Semaphore(self.concurrent_users)
         
-        # Use Brightdata if available, otherwise legacy proxy
-        self.proxy = BRIGHTDATA_PROXY or PROXY_URL
+        # Use SOAX proxy
+        self.proxy = PROXY_URL
         
         self.stats = {
             "subreddits_crawled": 0,
@@ -92,7 +91,7 @@ class ParallelSubredditCrawler:
         logger.info(f"[Worker {self.worker_id}] Concurrent subreddits: {self.concurrent_subs}")
         logger.info(f"[Worker {self.worker_id}] Concurrent users: {self.concurrent_users}")
         logger.info(f"[Worker {self.worker_id}] Min subscribers: {self.min_subscribers}")
-        logger.info(f"[Worker {self.worker_id}] Proxy: {'Brightdata' if BRIGHTDATA_PROXY else 'Legacy' if self.proxy else 'None'}")
+        logger.info(f"[Worker {self.worker_id}] Proxy: {'SOAX' if self.proxy else 'None'}")
         logger.info(f"[Worker {self.worker_id}] ========================================")
         
         # Reset any stale processing entries from crashed runs
@@ -423,7 +422,7 @@ async def seed_queue_from_keywords(supabase: SupabaseClient, proxy: str = None):
     """
     from subreddit_discovery import SubredditDiscovery
     
-    proxy = proxy or BRIGHTDATA_PROXY or PROXY_URL
+    proxy = proxy or PROXY_URL
     
     logger.info("Seeding crawler queue from search keywords...")
     

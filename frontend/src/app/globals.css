@@ -147,6 +147,32 @@ body {
   overflow: hidden;
 }
 
+/* Image fade-in on load - use onload handler to add .loaded class */
+.img-fade-in {
+  transition: opacity 0.25s ease-in-out;
+}
+
+/* Skeleton pulse animation */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--muted) 0%,
+    var(--secondary) 50%,
+    var(--muted) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
 
 
 

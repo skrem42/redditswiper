@@ -14,8 +14,9 @@ import httpx
 from typing import Optional
 from openai import AsyncOpenAI
 from dotenv import load_dotenv
+from config import LLM_REDDIT_PROXY, OPENAI_API_KEY
 
-# Load environment variables from scraper/.env
+# Load environment variables for OpenAI key if not in config
 load_dotenv("/Users/calummelling/Desktop/redditscraper/scraper/.env")
 
 logger = logging.getLogger(__name__)
@@ -24,21 +25,25 @@ logger = logging.getLogger(__name__)
 class SubredditLLMAnalyzer:
     """Analyzes subreddit data using LLM to extract structured metadata."""
     
-    def __init__(self, api_key: Optional[str] = None, proxy_url: Optional[str] = None, rotation_callback = None):
-        self.api_key = api_key or os.getenv("OPENAI_API_KEY")
+    def __init__(self, api_key: Optional[str] = None, reddit_proxy: Optional[str] = None, rotation_callback = None):
+        # OpenAI API key
+        self.api_key = api_key or OPENAI_API_KEY or os.getenv("OPENAI_API_KEY")
         if not self.api_key:
             raise ValueError("OPENAI_API_KEY environment variable is required")
         
+        # OpenAI client - NO PROXY (direct connection)
         self.client = AsyncOpenAI(api_key=self.api_key)
         # Using GPT-4o-mini: Latest mini model
         # Cost: $0.150 per 1M input tokens, $0.600 per 1M output tokens
         # Average ~$0.0002 per subreddit analysis
         self.model = "gpt-4o-mini"
         
-        # Proxy support
-        self.proxy_url = proxy_url
+        # ProxyEmpire proxy for Reddit API calls only
+        self.reddit_proxy = reddit_proxy or LLM_REDDIT_PROXY
         self.rotation_callback = rotation_callback  # Function to call when rate limited
-        logger.info(f"LLM Analyzer initialized with proxy: {'Yes' if proxy_url else 'No'}")
+        logger.info(f"LLM Analyzer initialized")
+        logger.info(f"  - Reddit API proxy: {self.reddit_proxy[:40]}..." if self.reddit_proxy else "  - Reddit API proxy: None")
+        logger.info(f"  - OpenAI API: Direct connection (no proxy)")
     
     async def _fetch_recent_posts(self, subreddit_name: str, limit: int = 10) -> list:
         """Fetch recent posts from subreddit to analyze posting patterns."""
@@ -57,10 +62,11 @@ class SubredditLLMAnalyzer:
             try:
                 client_kwargs = {
                     "timeout": 30.0,
-                    "follow_redirects": True
+                    "follow_redirects": True,
+                    "verify": False  # Disable SSL verification for proxy
                 }
-                if self.proxy_url:
-                    client_kwargs["proxy"] = self.proxy_url
+                if self.reddit_proxy:
+                    client_kwargs["proxy"] = self.reddit_proxy
                 
                 async with httpx.AsyncClient(**client_kwargs) as client:
                     response = await client.get(url, headers=headers)
@@ -121,10 +127,11 @@ class SubredditLLMAnalyzer:
             try:
                 client_kwargs = {
                     "timeout": 15.0,
-                    "follow_redirects": True
+                    "follow_redirects": True,
+                    "verify": False  # Disable SSL verification for proxy
                 }
-                if self.proxy_url:
-                    client_kwargs["proxy"] = self.proxy_url
+                if self.reddit_proxy:
+                    client_kwargs["proxy"] = self.reddit_proxy
                 
                 async with httpx.AsyncClient(**client_kwargs) as client:
                     response = await client.get(url, headers=headers)
@@ -314,10 +321,13 @@ class SubredditLLMAnalyzer:
                     if profile.get("profile_description"):
                         profile_section += f" ('{profile['profile_description'][:80]}...')"
         
+        # Handle None subscribers
+        subs_str = f"{subscribers:,}" if subscribers else "Unknown"
+        
         return f"""Analyze this NSFW subreddit and extract key information:
 
 **Subreddit:** r/{subreddit_name}
-**Subscribers:** {subscribers:,}
+**Subscribers:** {subs_str}
 **Description:** {description or "No description"}
 
 **Rules:**

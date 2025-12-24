@@ -13,7 +13,7 @@ from typing import Optional
 from dataclasses import dataclass
 from datetime import datetime
 
-from config import REDDIT_ACCOUNTS, REDDIT_USERNAME, REDDIT_PASSWORD
+from config import REDDIT_ACCOUNTS
 
 logger = logging.getLogger(__name__)
 
@@ -115,7 +115,7 @@ class AccountManager:
     
     def _load_accounts(self, accounts: list[dict]):
         """Load accounts from config data."""
-        for acc in accounts:
+        for idx, acc in enumerate(accounts):
             if not acc.get("username") or not acc.get("reddit_session"):
                 logger.warning(f"Skipping incomplete account config: {acc.get('username', 'unknown')}")
                 continue

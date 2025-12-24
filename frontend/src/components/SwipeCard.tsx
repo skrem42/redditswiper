@@ -17,6 +17,7 @@ export function SwipeCard({ lead, onSwipe, onSuperLike, isActive }: SwipeCardPro
   const [carouselIndex, setCarouselIndex] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set());
   const x = useMotionValue(0);
   const rotate = useTransform(x, [-300, 0, 300], [-15, 0, 15]);
   const opacity = useTransform(x, [-300, -100, 0, 100, 300], [0.5, 1, 1, 1, 0.5]);
@@ -89,21 +90,41 @@ export function SwipeCard({ lead, onSwipe, onSuperLike, isActive }: SwipeCardPro
     if (!lead.reddit_posts) return [];
     const allUrls = lead.reddit_posts.flatMap(p => p.media_urls || []);
     const unique = [...new Set(allUrls)];
-    // Shuffle for variety
+    // Shuffle for variety (using lead id as seed for consistency)
+    const seededRandom = (seed: number) => {
+      const x = Math.sin(seed++) * 10000;
+      return x - Math.floor(x);
+    };
+    let seed = lead.id.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
     for (let i = unique.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
+      const j = Math.floor(seededRandom(seed++) * (i + 1));
       [unique[i], unique[j]] = [unique[j], unique[i]];
     }
     return unique.slice(0, 12);
-  }, [lead.reddit_posts]);
+  }, [lead.reddit_posts, lead.id]);
 
-  // Preload images for faster viewing
+  // Optimize URLs where possible (imgur thumbnails work, Reddit needs original)
+  const getOptimizedUrl = (url: string) => {
+    // For imgur, use their thumbnail suffixes for faster loading
+    if (url.includes('i.imgur.com') && !url.includes('_d.')) {
+      // Add 'l' suffix for large thumbnail (640px) - good balance of quality/speed
+      const ext = url.match(/\.(jpg|jpeg|png|gif|webp)$/i)?.[0] || '.jpg';
+      if (!url.includes('l' + ext) && !url.includes('m' + ext)) {
+        return url.replace(ext, `l${ext}`);
+      }
+    }
+    // Reddit URLs - use as-is, they're already CDN-optimized
+    return url;
+  };
+
+  // Preload only FIRST page images for speed
   useEffect(() => {
-    mediaUrls.forEach((url) => {
-      const img = new Image();
-      img.src = url;
+    const firstPageUrls = mediaUrls.slice(0, isMobile ? 2 : 3);
+    firstPageUrls.forEach((url) => {
+      const img = new window.Image();
+      img.src = getOptimizedUrl(url);
     });
-  }, [mediaUrls]);
+  }, [mediaUrls, isMobile]);
 
   // Calculate carousel pages (3 images per page on desktop, 2 on mobile)
   const IMAGES_PER_PAGE = isMobile ? 2 : 3;
@@ -307,22 +328,39 @@ export function SwipeCard({ lead, onSwipe, onSuperLike, isActive }: SwipeCardPro
                 <div className={`grid gap-1.5 ${isMobile ? 'grid-cols-2' : 'grid-cols-3'}`}>
                   {currentPageImages.map((url, i) => {
                     const globalIndex = carouselIndex * IMAGES_PER_PAGE + i;
+                    const optimizedUrl = getOptimizedUrl(url);
+                    const isLoaded = loadedImages.has(url);
                     return (
                       <button
-                        key={globalIndex}
+                        key={`${lead.id}-${globalIndex}`}
                         onClick={() => {
                           setLightboxImageIndex(globalIndex);
                           setLightboxOpen(true);
                         }}
-                        className="relative aspect-[3/4] overflow-hidden rounded-lg cursor-pointer group bg-muted"
+                        className="relative aspect-[3/4] overflow-hidden rounded-lg cursor-pointer group bg-zinc-800"
                       >
+                        {/* Skeleton - hidden when image loads */}
+                        {!isLoaded && (
+                          <div className="absolute inset-0 bg-gradient-to-r from-zinc-800 via-zinc-700 to-zinc-800 animate-pulse" />
+                        )}
                         <img
-                          src={url}
+                          src={optimizedUrl}
                           alt={`Preview ${globalIndex + 1}`}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                          loading="eager"
+                          className={`absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-all duration-200 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}
+                          loading={carouselIndex === 0 && i < 2 ? "eager" : "lazy"}
+                          decoding="async"
+                          onLoad={() => {
+                            setLoadedImages(prev => new Set(prev).add(url));
+                          }}
+                          onError={(e) => {
+                            // Fallback to original URL if optimized fails
+                            const target = e.target as HTMLImageElement;
+                            if (target.src !== url) {
+                              target.src = url;
+                            }
+                          }}
                         />
-                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors pointer-events-none" />
                       </button>
                     );
                   })}
@@ -667,17 +705,24 @@ export function SwipeCard({ lead, onSwipe, onSuperLike, isActive }: SwipeCardPro
               </button>
             )}
 
-            {/* Main image */}
-            <motion.img
-              key={lightboxImageIndex}
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              src={mediaUrls[lightboxImageIndex]}
-              alt={`Full preview ${lightboxImageIndex + 1}`}
-              className="max-h-[90vh] max-w-[90vw] object-contain rounded-lg"
-              onClick={(e) => e.stopPropagation()}
-            />
+            {/* Main image with loading state */}
+            <div className="relative">
+              {/* Loading spinner */}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-8 h-8 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              </div>
+              <motion.img
+                key={lightboxImageIndex}
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                src={mediaUrls[lightboxImageIndex]}
+                alt={`Full preview ${lightboxImageIndex + 1}`}
+                className="relative max-h-[90vh] max-w-[90vw] object-contain rounded-lg bg-black"
+                onClick={(e) => e.stopPropagation()}
+                loading="eager"
+              />
+            </div>
 
             {/* Keyboard hint - hidden on mobile */}
             <div className="hidden md:flex absolute bottom-4 left-1/2 -translate-x-1/2 text-white/60 text-xs items-center gap-4">

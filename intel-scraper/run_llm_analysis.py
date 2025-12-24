@@ -12,12 +12,17 @@ load_dotenv("/Users/calummelling/Desktop/redditscraper/scraper/.env")
 
 from supabase_client import SupabaseClient
 from llm_analyzer import SubredditLLMAnalyzer
+from config import LLM_REDDIT_PROXY, OPENAI_API_KEY
 
-async def fetch_subreddit_rules(subreddit_name: str) -> list:
+async def fetch_subreddit_rules(subreddit_name: str, proxy_url: str = None) -> list:
     """Fetch subreddit rules from Reddit API."""
     try:
         url = f"https://www.reddit.com/r/{subreddit_name}/about/rules.json"
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        client_kwargs = {"timeout": 30.0}
+        if proxy_url:
+            client_kwargs["proxy"] = proxy_url  # Fixed: use "proxy" not "proxies"
+        
+        async with httpx.AsyncClient(**client_kwargs) as client:
             response = await client.get(url)
             if response.status_code == 200:
                 data = response.json()
@@ -26,11 +31,15 @@ async def fetch_subreddit_rules(subreddit_name: str) -> list:
         print(f"Could not fetch rules for r/{subreddit_name}: {e}")
     return []
 
-async def fetch_subreddit_about(subreddit_name: str) -> dict:
+async def fetch_subreddit_about(subreddit_name: str, proxy_url: str = None) -> dict:
     """Fetch subreddit about data from Reddit API."""
     try:
         url = f"https://www.reddit.com/r/{subreddit_name}/about.json"
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        client_kwargs = {"timeout": 30.0}
+        if proxy_url:
+            client_kwargs["proxy"] = proxy_url  # Fixed: use "proxy" not "proxies"
+        
+        async with httpx.AsyncClient(**client_kwargs) as client:
             response = await client.get(url)
             if response.status_code == 200:
                 data = response.json()
@@ -44,19 +53,20 @@ async def process_subreddit(
     analyzer: SubredditLLMAnalyzer,
     supabase: SupabaseClient,
     index: int,
-    total: int
+    total: int,
+    reddit_proxy: str = None
 ) -> tuple[bool, float]:
     """Process a single subreddit with LLM analysis."""
     subreddit_name = subreddit_data["subreddit_name"]
     subreddit_id = subreddit_data["id"]
-    subscribers = subreddit_data.get("subscribers", 0)
+    subscribers = subreddit_data.get("subscribers") or 0
     
     print(f"[{index}/{total}] Analyzing r/{subreddit_name} ({subscribers:,} subscribers)...")
     
     try:
         # Fetch rules and description in parallel
-        rules_task = fetch_subreddit_rules(subreddit_name)
-        about_task = fetch_subreddit_about(subreddit_name)
+        rules_task = fetch_subreddit_rules(subreddit_name, reddit_proxy)
+        about_task = fetch_subreddit_about(subreddit_name, reddit_proxy)
         
         rules, about_data = await asyncio.gather(rules_task, about_task)
         description = about_data.get("public_description", "")
@@ -98,9 +108,10 @@ async def run_llm_analysis(limit: int = 10, skip_existing: bool = True, batch_si
     """Run LLM analysis on subreddits and save to database."""
     
     # Check for OpenAI API key
-    if not os.getenv("OPENAI_API_KEY"):
-        print("❌ OPENAI_API_KEY environment variable not set!")
-        print("   Set it with: export OPENAI_API_KEY='your-key-here'")
+    api_key = OPENAI_API_KEY or os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        print("❌ OPENAI_API_KEY not set!")
+        print("   Set it in config.py or environment variable")
         return
     
     print("🔍 Fetching subreddits from database...")
@@ -124,9 +135,11 @@ async def run_llm_analysis(limit: int = 10, skip_existing: bool = True, batch_si
     
     print(f"✓ Found {len(subreddits)} subreddits to analyze")
     print(f"⚡ Processing in batches of {batch_size}")
+    print(f"🌐 Reddit API proxy: ProxyEmpire ({LLM_REDDIT_PROXY.split('@')[1]})")
+    print(f"🌐 OpenAI API: Direct connection (no proxy)")
     print("=" * 80)
     
-    # Initialize LLM analyzer
+    # Initialize LLM analyzer - uses hardcoded proxies from config
     analyzer = SubredditLLMAnalyzer()
     
     total_cost = 0.0
@@ -143,7 +156,7 @@ async def run_llm_analysis(limit: int = 10, skip_existing: bool = True, batch_si
         
         # Process batch in parallel
         tasks = [
-            process_subreddit(sub_data, analyzer, supabase, batch_start + i + 1, len(subreddits))
+            process_subreddit(sub_data, analyzer, supabase, batch_start + i + 1, len(subreddits), LLM_REDDIT_PROXY)
             for i, sub_data in enumerate(batch)
         ]
         
@@ -169,7 +182,7 @@ async def run_llm_analysis(limit: int = 10, skip_existing: bool = True, batch_si
 
 async def main():
     import argparse
-    parser = argparse.ArgumentParser(description="Run LLM analysis on subreddits (FAST)")
+    parser = argparse.ArgumentParser(description="Run LLM analysis on subreddits")
     parser.add_argument(
         "--limit",
         type=int,
@@ -193,4 +206,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-

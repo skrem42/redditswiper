@@ -1,9 +1,8 @@
 """
-Configuration for the Intel Scraper Worker.
-Set environment variables for production deployment.
+Configuration for the Intel Scraper Worker and LLM Analyzer.
+Hardcoded settings for production use.
 """
 import os
-import json
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -11,97 +10,115 @@ load_dotenv()
 # =============================================================================
 # SUPABASE CONFIGURATION
 # =============================================================================
-SUPABASE_URL = os.getenv("SUPABASE_URL", "https://jmchmbwhnmlednaycxqh.supabase.co")
-SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImptY2htYndobm1sZWRuYXljeHFoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMzODI4MzYsImV4cCI6MjA3ODk1ODgzNn0.Ux8SqBEj1isHUGIiGh4I-MM54dUb3sd0D7VsRjRKDuU")
+SUPABASE_URL = "https://jmchmbwhnmlednaycxqh.supabase.co"
+SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImptY2htYndobm1sZWRuYXljeHFoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMzODI4MzYsImV4cCI6MjA3ODk1ODgzNn0.Ux8SqBEj1isHUGIiGh4I-MM54dUb3sd0D7VsRjRKDuU"
 
 # =============================================================================
-# PROXY CONFIGURATION
+# PROXY CONFIGURATION - SOAX (Intel Worker)
 # =============================================================================
-# Brightdata Residential Rotating Proxy (RECOMMENDED - new IP per request)
-# Format: http://user-zone-residential:password@brd.superproxy.io:22225
-BRIGHTDATA_PROXY = os.getenv("BRIGHTDATA_PROXY", "")
+PROXY_URL = "http://package-329587-sessionid-dCA64Iso3jw8VBw0-sessionlength-300:YtaNW215Z7RP5A0b@proxy.soax.com:5000"
+PROXY_ROTATION_URL = ""  # SOAX rotates via session
 
-# Legacy: Single rotating proxy with manual IP rotation API
-PROXY_HOST = os.getenv("PROXY_HOST", "")
-PROXY_PORT = os.getenv("PROXY_PORT", "")
-PROXY_USER = os.getenv("PROXY_USER", "")
-PROXY_PASS = os.getenv("PROXY_PASS", "")
-
-# Construct proxy server URL (without auth for Playwright)
-if BRIGHTDATA_PROXY:
-    # Parse Brightdata URL for Playwright (needs server separate from auth)
-    import re
-    _bd_match = re.match(r'https?://([^:]+):([^@]+)@([^:]+):(\d+)', BRIGHTDATA_PROXY)
-    if _bd_match:
-        PROXY_USER = _bd_match.group(1)
-        PROXY_PASS = _bd_match.group(2)
-        PROXY_SERVER = f"http://{_bd_match.group(3)}:{_bd_match.group(4)}"
-    else:
-        PROXY_SERVER = BRIGHTDATA_PROXY
-elif PROXY_HOST and PROXY_PORT:
-    PROXY_SERVER = f"http://{PROXY_HOST}:{PROXY_PORT}"
+# Parse for Playwright (needs server separate from auth)
+import re
+_match = re.match(r'https?://([^:]+):([^@]+)@([^:]+):(\d+)', PROXY_URL)
+if _match:
+    PROXY_USER = _match.group(1)
+    PROXY_PASS = _match.group(2)
+    PROXY_SERVER = f"http://{_match.group(3)}:{_match.group(4)}"
 else:
+    PROXY_USER = ""
+    PROXY_PASS = ""
     PROXY_SERVER = ""
 
-# Full proxy URL with auth embedded
-if BRIGHTDATA_PROXY:
-    PROXY_URL = BRIGHTDATA_PROXY
-elif PROXY_HOST and PROXY_PORT and PROXY_USER and PROXY_PASS:
-    PROXY_URL = f"http://{PROXY_USER}:{PROXY_PASS}@{PROXY_HOST}:{PROXY_PORT}"
-else:
-    PROXY_URL = os.getenv("PROXY_URL", "")
+# =============================================================================
+# LLM ANALYZER PROXY - SOAX (for Reddit fetching only)
+# =============================================================================
+LLM_REDDIT_PROXY = "http://package-329587-sessionid-dCA64Iso3jw8VBw0-sessionlength-300:YtaNW215Z7RP5A0b@proxy.soax.com:5000"
 
-# Rotation API URL - only needed for legacy proxies (Brightdata auto-rotates)
-PROXY_ROTATION_URL = os.getenv("PROXY_ROTATION_URL", "")
+# OpenAI API Key (keep env for security)
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 
 # =============================================================================
-# REDDIT ACCOUNTS (for NSFW access with parallel scraping)
+# REDDIT ACCOUNTS (10 accounts for parallel scraping)
 # =============================================================================
-# Multiple accounts for parallel browser pool
-# Format: JSON array of account objects with cookies
-# Example: REDDIT_ACCOUNTS='[{"username": "user1", "reddit_session": "...", "token_v2": "...", "loid": "..."}]'
-_reddit_accounts_str = os.getenv("REDDIT_ACCOUNTS", "")
-if _reddit_accounts_str:
-    try:
-        REDDIT_ACCOUNTS = json.loads(_reddit_accounts_str)
-    except json.JSONDecodeError:
-        print("Warning: Could not parse REDDIT_ACCOUNTS env var")
-        REDDIT_ACCOUNTS = []
-else:
-    REDDIT_ACCOUNTS = []
-
-# Legacy single account (fallback if REDDIT_ACCOUNTS not set)
-REDDIT_USERNAME = os.getenv("REDDIT_USERNAME", "petitebbyxoxod")
-REDDIT_PASSWORD = os.getenv("REDDIT_PASSWORD", "KyvNzPv@NRYy2@y")
+REDDIT_ACCOUNTS = [
+    {
+        "username": "reddit_account_1",
+        "reddit_session": "eyJhbGciOiJSUzI1NiIsImtpZCI6IlNIQTI1NjpsVFdYNlFVUEloWktaRG1rR0pVd1gvdWNFK01BSjBYRE12RU1kNzVxTXQ4IiwidHlwIjoiSldUIn0.eyJzdWIiOiJ0Ml8xY2VxOGdvcWk1IiwiZXhwIjoxNzgyMjA1MzU4LjQ3ODYzMSwiaWF0IjoxNzY2NTY2OTU4LjQ3ODYzMSwianRpIjoiTkNBREtsYTlWNTV0dU9QVFVtUFFVNk9DeGUtemJRIiwiYXQiOjEsImNpZCI6ImNvb2tpZSIsImxjYSI6MTczMDkwMzIzNjg5Niwic2NwIjoiZUp5S2pnVUVBQURfX3dFVkFMayIsImZsbyI6MiwiYW1yIjpbInB3ZCJdfQ.F9vPV15DcQOuW_rY_P5jZNdh6m-CNCDbn3SEqqf52iFEjY8aluYjVha89QWa0TN8TQFZkuV3yhF83PF--5bkjIsWxZxd2My0MqntDcyhiIzT2Qnv6wdXn-gxxctgFpK-fm1gfXU07u3cDspSGug81ytfme7oBxfQVMDWPU4ReQDHul2j0FWmp1MTfmVe6egffqJqBGgmkY56nGkiafygM1Eu42pRaHR-3E8fv03aTom6dS1XolPkN98MTU7ox7loL3C3PFush4uta-PocTnSllq_0Af5NCEBuAMZp5r8EvjaXGpBsd61wTpGlEs6DdkO2R9w6FjFTmOUrdQS5zOErg",
+        "token_v2": "eyJhbGciOiJSUzI1NiIsImtpZCI6IlNIQTI1NjpzS3dsMnlsV0VtMjVmcXhwTU40cWY4MXE2OWFFdWFyMnpLMUdhVGxjdWNZIiwidHlwIjoiSldUIn0.eyJzdWIiOiJ1c2VyIiwiZXhwIjoxNzY2NjUzMzU5LjA3MDU1OSwiaWF0IjoxNzY2NTY2OTU5LjA3MDU1OSwianRpIjoiU3U3WmxNTEtuUlNZN2RqakNYU1I1YmZZUDMzbGdRIiwiY2lkIjoiMFItV0FNaHVvby1NeVEiLCJsaWQiOiJ0Ml8xY2VxOGdvcWk1IiwiYWlkIjoidDJfMWNlcThnb3FpNSIsImF0IjoxLCJsY2EiOjE3MzA5MDMyMzY4OTYsInNjcCI6ImVKeGtrZEdPdERBSWhkLUZhNV9nZjVVX20wMXRjWWFzTFFhb2szbjdEVm9jazcwN2NENHBIUDlES29xRkRDWlhncW5BQkZnVHJUREJSdVQ5bkxtM2cyaU5lOHRZc1puQ0JGbXdGRHJrbUxHc2lRUW1lSklheXhzbW9JTE55Rnl1dEdOTkxUMFFKcWhjTXJlRkhwYzJvYmtiaTU2ZEdGVzVyRHlvc1ZmbDB0akdGTFlueGpjYnF3MnB1QzZuTWtuTFF2a3NYdlRqTjlXMzl2bXpfU2EwSjhPS3F1bUIzaGxKQ0c0c2ZwaW0zZDlUazU2dEN4YTE5M3FRMnVkNjNLNTkxaXcwTzdlZjZfbHJJeG1YWTJoLUp2dDMxeS1oQTQ4OEx6UHFBRWFzNFVjWmRtUWRfbFVIVUxtZ0pHTUo0dE1JNU1ybDIzOEp0bXZUdjhidEV6OThNLUttTl96V0ROUnpDZUxRcF9IMUd3QUFfXzhRMWVUUiIsInJjaWQiOiJIbE9HWnNKbUpkdjhxV0JiUGVsSE84QmJtRlVSd0xZZURKa21OQU1GbGRrIiwiZmxvIjoyfQ.nIuRxnarq_UfjSGisY_tXUxUWByKfMiuAe3LtaPZ-gSV_vcbkAbqbfNMdIPmcPK1vENBj-_xSSE-TO1vk93N0iCJI2pcXi7c3WHKiK3zAA21pc_G8DyOb_BXcSAxvAHpDyHtp2xQ2Dn6XzYyf-6eCbdE55jPs2cPv_9RFBOzbJdKuImLWTFUeu-rXNmhcJN85oywm0veplcPzVKaGJfkF687OJhWGs3iSQqHXMYorEn6AuhW53Hih8ZPaCJWFv-qPTjb41XY2A7aml6hOUohCSStXJBfDcczDQn3Qm8D3zganjE3UegcTmx6xSkRIcBJ9nW7PEs38WDqc4EhaOp71A",
+        "loid": "000000001ceq8goqi5.2.1730903236896.Z0FBQUFBQm5LM3pFR3dFenlMdzhDWFdMZTVEWlZ2UTFreVcwTzlyYkh6Uk5heF9JR2lsclRKNjh1Z1Z2cjc4al9fVFgxbXhkOUQzN2Y0dmF4Q2hRcUx2bVJBelpfbFI5ME8wZnBXeUZkdWFWVVYyeTAxTlZ2UTVpZlI1a2dkU0xkR285QVNVTGt0Ujk",
+    },
+    {
+        "username": "reddit_account_2",
+        "reddit_session": "eyJhbGciOiJSUzI1NiIsImtpZCI6IlNIQTI1NjpsVFdYNlFVUEloWktaRG1rR0pVd1gvdWNFK01BSjBYRE12RU1kNzVxTXQ4IiwidHlwIjoiSldUIn0.eyJzdWIiOiJ0Ml8xYmIyN3Zzazc1IiwiZXhwIjoxNzgyMjA2NDIzLjk3MTQ1OCwiaWF0IjoxNzY2NTY4MDIzLjk3MTQ1OCwianRpIjoiaTRMaDVMWFNJT09YUTVBaGZoOW5PZFI1WFBVWUdnIiwiYXQiOjEsImNpZCI6ImNvb2tpZSIsImxjYSI6MTcyOTUxMzY0MDY0OCwic2NwIjoiZUp5S2pnVUVBQURfX3dFVkFMayIsImZsbyI6MiwiYW1yIjpbInB3ZCJdfQ.cEbH01ZTW0RKtUD7E1cvtPnjxlP7zS0QKv2Fl6odd4qeRqUh6aCzQvuujGsdaBsTAXA6AUQPeSPtkf-FCXr5f3-4qQuR_A0voOF0e4G-NgNOmOI25h4deMboqTN5RInr1tSR0GCOA0jSTbyfb2zdBW9XEfaggS9DbOQXTQETqOmDDsiHFx2flcX19uDOhU2FfOgrd0OCgO8RIkHd4u87LvGxmm6SgWemkshcQC0P3VzkEJIlUGV0Thv5mMP65pwCM0oQNKrrKb_jLB1YNJg3K53GDLgCa9sL-3-8yfKAXrBSbbhdaG6w9HHpUSo227gPQmV8CHlY68bfpPCkbPyPIw",
+        "token_v2": "eyJhbGciOiJSUzI1NiIsImtpZCI6IlNIQTI1NjpzS3dsMnlsV0VtMjVmcXhwTU40cWY4MXE2OWFFdWFyMnpLMUdhVGxjdWNZIiwidHlwIjoiSldUIn0.eyJzdWIiOiJ1c2VyIiwiZXhwIjoxNzY2NjU0NDI0LjUxMzEyOSwiaWF0IjoxNzY2NTY4MDI0LjUxMzEyOCwianRpIjoiN3MySTc3MFFfVVpGUGUyTFdkUXRDeUQ2bTZwdXZRIiwiY2lkIjoiMFItV0FNaHVvby1NeVEiLCJsaWQiOiJ0Ml8xYmIyN3Zzazc1IiwiYWlkIjoidDJfMWJiMjd2c2s3NSIsImF0IjoxLCJsY2EiOjE3Mjk1MTM2NDA2NDgsInNjcCI6ImVKeGtrZEdPdERBSWhkLUZhNV9nZjVVX20wMXRjWWFzTFFhb2szbjdEVm9jazcwN2NENHBIUDlES29xRkRDWlhncW5BQkZnVHJUREJSdVQ5bkxtM2cyaU5lOHRZc1puQ0JGbXdGRHJrbUxHc2lRUW1lSklheXhzbW9JTE55Rnl1dEdOTkxUMFFKcWhjTXJlRkhwYzJvYmtiaTU2ZEdGVzVyRHlvc1ZmbDB0akdGTFlueGpjYnF3MnB1QzZuTWtuTFF2a3NYdlRqTjlXMzl2bXpfU2EwSjhPS3F1bUIzaGxKQ0c0c2ZwaW0zZDlUazU2dEN4YTE5M3FRMnVkNjNLNTkxaXcwTzdlZjZfbHJJeG1YWTJoLUp2dDMxeS1oQTQ4OEx6UHFBRWFzNFVjWmRtUWRfbFVIVUxtZ0pHTUo0dE1JNU1ybDIzOEp0bXZUdjhidEV6OThNLUttTl96V0ROUnpDZUxRcF9IMUd3QUFfXzhRMWVUUiIsInJjaWQiOiJKUXFJZUpUR1l2ajlkQk5MSDZPX3BvZHdya3NqT05vZTdUSDRmRUZIamRjIiwiZmxvIjoyfQ.Ui-2KIe6bpom447JtzBmEZ5srwf0h41Y4bWfZ_KiCGiJBfhuBQxWFXBA8ov9jyWHmsn6pJEo0_8KMfnH3w7snciPuwoVQgdpXOZWXS-5HrfgwxOkGcCtmZe8MCY2I-w_4o8Wl89Ek7TxdIYu8Gy1HM731wunuFbhfaDOtFa8xaI8_9Npd5xDFlLg4rLh4Y73GDyG_kU71BYCT_rlDGbdKoS8RFJ2nGKLf8-HG5nv8-GcsrPgQJukB-tjI2f28tZzrd6w9CPoGWWVcgb1mBA1gvrSVQ4mY1IcXkzrZsDCU0xRC4BsxbNX22eO9MZb3beu8U5zfWns7r_r262hP8fGkw",
+        "loid": "000000001bb27vsk75.2.1729513640648.Z0FBQUFBQm5pcTZLamkzWGFRSUE1WTYtWC1LNWV2VjE4NTlSWHBvVERETVJBR1RIS19zcy1CZFdsUVM0a3FSUDBLRGFDZkJxZ1Z4ZzY4T3FDMGpTWU1rUE10V0hwQU16SlJINzJGNTZlUExDRTZOcUhCVEI1M0cxdGlGbTdpVVM3ZjBZbWEyMWZFQk0",
+    },
+    {
+        "username": "reddit_account_3",
+        "reddit_session": "eyJhbGciOiJSUzI1NiIsImtpZCI6IlNIQTI1NjpsVFdYNlFVUEloWktaRG1rR0pVd1gvdWNFK01BSjBYRE12RU1kNzVxTXQ4IiwidHlwIjoiSldUIn0.eyJzdWIiOiJ0Ml8xYmIycnZyMmcxIiwiZXhwIjoxNzgyMjA2Njk5LjkzMDc5MywiaWF0IjoxNzY2NTY4Mjk5LjkzMDc5MywianRpIjoiblcwT0tZQnRLWVBkTXJHUlNmbHRQN2xCMmVxRml3IiwiYXQiOjEsImNpZCI6ImNvb2tpZSIsImxjYSI6MTcyOTUxNDE3MzgzNCwic2NwIjoiZUp5S2pnVUVBQURfX3dFVkFMayIsImZsbyI6MiwiYW1yIjpbInB3ZCJdfQ.nNQKOxg0py59Sur8Qm0J9HFn20gCMc_-ioI9mINmif20VnHRPirxMyA5PFEHJ6FbtTvN8CnYG-aDbRd-uBtJ3VII2vNtZ1oudYBrXr3DZAQu31zUvdcj3bjpGe2aan-IJZUNgfhDI0YiZNgHU7VhZGVVyZjZxJD_lxF3Sb9k_YBL-Fi-v00WyeX_pEy0BPJtvcxpoEBrB4nKwbdp5lFLhcnxnONrXeqMdl8_RY5Xo9SflrElURcpRSnforVm_3VJeTJgxR584xsNVi8WotZXqM_WKc5TzwL7XszW4dL2QN_9KslehoBThER4YI2CcMApvFe_x954AEca9kdEhAiwMg",
+        "token_v2": "eyJhbGciOiJSUzI1NiIsImtpZCI6IlNIQTI1NjpzS3dsMnlsV0VtMjVmcXhwTU40cWY4MXE2OWFFdWFyMnpLMUdhVGxjdWNZIiwidHlwIjoiSldUIn0.eyJzdWIiOiJ1c2VyIiwiZXhwIjoxNzY2NjU0NzAwLjQ5ODkwOSwiaWF0IjoxNzY2NTY4MzAwLjQ5ODkwOSwianRpIjoiX2dWZWVST1NkUlNLeFltb3dZYi1GcGZ5YU8xRE13IiwiY2lkIjoiMFItV0FNaHVvby1NeVEiLCJsaWQiOiJ0Ml8xYmIycnZyMmcxIiwiYWlkIjoidDJfMWJiMnJ2cjJnMSIsImF0IjoxLCJsY2EiOjE3Mjk1MTQxNzM4MzQsInNjcCI6ImVKeGtrZEdPdERBSWhkLUZhNV9nZjVVX20wMXRjWWFzTFFhb2szbjdEVm9jazcwN2NENHBIUDlES29xRkRDWlhncW5BQkZnVHJUREJSdVQ5bkxtM2cyaU5lOHRZc1puQ0JGbXdGRHJrbUxHc2lRUW1lSklheXhzbW9JTE55Rnl1dEdOTkxUMFFKcWhjTXJlRkhwYzJvYmtiaTU2ZEdGVzVyRHlvc1ZmbDB0akdGTFlueGpjYnF3MnB1QzZuTWtuTFF2a3NYdlRqTjlXMzl2bXpfU2EwSjhPS3F1bUIzaGxKQ0c0c2ZwaW0zZDlUazU2dEN4YTE5M3FRMnVkNjNLNTkxaXcwTzdlZjZfbHJJeG1YWTJoLUp2dDMxeS1oQTQ4OEx6UHFBRWFzNFVjWmRtUWRfbFVIVUxtZ0pHTUo0dE1JNU1ybDIzOEp0bXZUdjhidEV6OThNLUttTl96V0ROUnpDZUxRcF9IMUd3QUFfXzhRMWVUUiIsInJjaWQiOiJuQnhTQWFRRGlveW1iV1NwTF9HQm1tcWx6aDhEM1hYeFdBSGFrNlNTRjk0IiwiZmxvIjoyfQ.bf0zzUwKTURWzkQGQeAHJzlY4h9_92FE9b6FU9v1bAF9ZvsF7J5NS5fVp_NKFfb7jf2Td-XFuSH9UwYSxqF2YBNd1XBusl4FRLRToWiHHlZ5ZG45lqme9SZVd7m3fESelRhT4JISICpR6WJsbiDUxijJrBgUWfAgv6_43POG1N-qs1mygrZ9Zdch5_GZU5NBgfI2KevbpldcFNbIEkYMrD17lNySsprLC3UBK6HnoGmvBSxWlDwapLqdoeX6oSeuY6KjmhLUyRRLvx-gNnD1H8LTmYsaiQvozzRJo8Bcn-0taLdgiPZa-MqpHB5-BmIrr0_1p41Fld3wiKqVdjvznw",
+        "loid": "000000001bb2rvr2g1.2.1729514173834.Z0FBQUFBQm5IZTNUb25jRXVFNHpMbVVRTXZKall6NnFwczhnd18yTWtmVF9adzFWQ1NYdDg0LTBjOERqa0NHNDVMeVRMT3lEVVA0bmF6MFJBU3JkX3c3a0ZfRUJ2Z0xkNnRySUxZLXBZZTJxUjViaDlnVW5BTVZxcmc0RWRrdnFlUEtZN3E4VUtCS3o",
+    },
+    {
+        "username": "reddit_account_4",
+        "reddit_session": "eyJhbGciOiJSUzI1NiIsImtpZCI6IlNIQTI1NjpsVFdYNlFVUEloWktaRG1rR0pVd1gvdWNFK01BSjBYRE12RU1kNzVxTXQ4IiwidHlwIjoiSldUIn0.eyJzdWIiOiJ0Ml8xYmtremF2b2xyIiwiZXhwIjoxNzgyMjA2ODk5Ljk1OTQxOCwiaWF0IjoxNzY2NTY4NDk5Ljk1OTQxOCwianRpIjoiY1ViQU12M1JKQUZWUHhNSTJDVDIwb2E5anZ4VURnIiwiYXQiOjEsImNpZCI6ImNvb2tpZSIsImxjYSI6MTcyOTg0NzE5MzIwMywic2NwIjoiZUp5S2pnVUVBQURfX3dFVkFMayIsImZsbyI6MiwiYW1yIjpbInB3ZCJdfQ.h2E2M7JgZbzp3dkYTZCiCokcdoMe0Adx-7mmQmA01I9vZ8CvNlW298-_S6S5X51XZLlwRSv0GtUsaAwIhJJD4BrhXff0tQ_5poyD47O-3V3rKBPv4Dg14l70GNMNoIt8RzPFjgoo6OWNeffV5JoSmdKkXsajq-g0gjXsskRcUR3_OLcivkKr2wAmgrieC7UXPvCYn0zOC0WfaPTbIsHVdaNPhH6UjA-azWJ2MgMk9YGSL5QsVcEp_yHOZ2JkiRhpdJhLDfz5QIhg0yiJ7DWLLSTGAviLd2IPAqu1MFDxi6BuaxJJy90uTzOUcKChM9XJNkjQoBJj5pAO0Vm9IL6QqA",
+        "token_v2": "eyJhbGciOiJSUzI1NiIsImtpZCI6IlNIQTI1NjpzS3dsMnlsV0VtMjVmcXhwTU40cWY4MXE2OWFFdWFyMnpLMUdhVGxjdWNZIiwidHlwIjoiSldUIn0.eyJzdWIiOiJ1c2VyIiwiZXhwIjoxNzY2NjU0OTAwLjUyNTk3MSwiaWF0IjoxNzY2NTY4NTAwLjUyNTk3MSwianRpIjoianVJanphelNPSjZKNFpiMFRvMjFpMUhOQkVFU053IiwiY2lkIjoiMFItV0FNaHVvby1NeVEiLCJsaWQiOiJ0Ml8xYmtremF2b2xyIiwiYWlkIjoidDJfMWJra3phdm9sciIsImF0IjoxLCJsY2EiOjE3Mjk4NDcxOTMyMDMsInNjcCI6ImVKeGtrZEdPdERBSWhkLUZhNV9nZjVVX20wMXRjWWFzTFFhb2szbjdEVm9jazcwN2NENHBIUDlES29xRkRDWlhncW5BQkZnVHJUREJSdVQ5bkxtM2cyaU5lOHRZc1puQ0JGbXdGRHJrbUxHc2lRUW1lSklheXhzbW9JTE55Rnl1dEdOTkxUMFFKcWhjTXJlRkhwYzJvYmtiaTU2ZEdGVzVyRHlvc1ZmbDB0akdGTFlueGpjYnF3MnB1QzZuTWtuTFF2a3NYdlRqTjlXMzl2bXpfU2EwSjhPS3F1bUIzaGxKQ0c0c2ZwaW0zZDlUazU2dEN4YTE5M3FRMnVkNjNLNTkxaXcwTzdlZjZfbHJJeG1YWTJoLUp2dDMxeS1oQTQ4OEx6UHFBRWFzNFVjWmRtUWRfbFVIVUxtZ0pHTUo0dE1JNU1ybDIzOEp0bXZUdjhidEV6OThNLUttTl96V0ROUnpDZUxRcF9IMUd3QUFfXzhRMWVUUiIsInJjaWQiOiJ5MHAzNktKVG1hQVVORHlBbmF3cjFBeDNzZUNEblRvZlo0bFJHNUxoUGUwIiwiZmxvIjoyfQ.ptas5JrioBAXorxJjkQuNdFyqLBX3tJ--s72_e40nY32KhH_Qo_6alHZAzNURiFpqT2JMldAEJ5gB0oTU-TpwEDVUD3GWYlphwr1DA7MtJPgTQakwagAO87qzgUuxADeliTWKcPO1b32CKIo1ZroP1AGklr6dEs_HyjFz619glZ7zU8Vybbo-R-3vmU1kABNd58NHf7V09PyVquytZ8__gaBtmiCabYvzCPQ6F8_Ne-MyOm0GiUA-6ZnwHdd1MDo7pDXguAUe4debAwNDTkoNKnF_BbmeeKwkAObwC40Zz3mmq0dAurmoH99aCaIQZUDxNkkNBBUYVcin666jcH0sg",
+        "loid": "000000001bkkzavolr.2.1729847193203.Z0FBQUFBQm5HMS1aYWNEeTdzV0p2ckxMNDRvT2tWNk1wdG5jbUs3c3p0UFBVeDk1cjRvNHBYcWVrTklDdGVBUTBXeHJBX3ItWUN2SXo0cGh3THRFWDNUOEFhZDhPT0d2Z0FrWmUxaUhfWVY5aXpmTnRkaFJtelFUb1RUV19nZmNNZDZISUNsMG5fYkY",
+    },
+    {
+        "username": "reddit_account_5",
+        "reddit_session": "eyJhbGciOiJSUzI1NiIsImtpZCI6IlNIQTI1NjpsVFdYNlFVUEloWktaRG1rR0pVd1gvdWNFK01BSjBYRE12RU1kNzVxTXQ4IiwidHlwIjoiSldUIn0.eyJzdWIiOiJ0Ml8xY2VqYnowNHlwIiwiZXhwIjoxNzgyMjA3MDM5LjYzMTYyMywiaWF0IjoxNzY2NTY4NjM5LjYzMTYyMywianRpIjoicVQzY3JxLWxFQTNkSXNhTW95V1VNQlUwZTdONHBBIiwiYXQiOjEsImNpZCI6ImNvb2tpZSIsImxjYSI6MTczMDg5NjU0NzQyNiwic2NwIjoiZUp5S2pnVUVBQURfX3dFVkFMayIsImZsbyI6MiwiYW1yIjpbInB3ZCJdfQ.rLgatJTf6bUHs0jg7XiGAOmAYdR8IxsvLCREvNJc8dBqcWVF2zWLQZJcGH5wmyu4pzT0cVVU4eaBRheyHSH6DtmjR9NL7yKn8CAwjcB772q-KBilXFJGVwUAwfxuIDspSqHoJdpNpjaHNVpDjditzTfF6mtiwnNdU1RRmiZafRu1-wzSYflXicdeGppdig21LiIuDEgJPhmcuGR2kICgNaLypodMGbBcBteLpn0AJsHeeOAvkYh0KCEb0HvssUH4J6OdMLSxH3AlraxfPJ8yr0XogRMsU2IL9lrkqgCBE5SstgHtYLWuAUITUFgcaGumjyW0KqLJtwNv7OMoqc0ScA",
+        "token_v2": "eyJhbGciOiJSUzI1NiIsImtpZCI6IlNIQTI1NjpzS3dsMnlsV0VtMjVmcXhwTU40cWY4MXE2OWFFdWFyMnpLMUdhVGxjdWNZIiwidHlwIjoiSldUIn0.eyJzdWIiOiJ1c2VyIiwiZXhwIjoxNzY2NjU1MDQwLjE3MDYwNSwiaWF0IjoxNzY2NTY4NjQwLjE3MDYwNCwianRpIjoiMkdBeGowNUZqVkZxeWpxZW42OUNtcXR3Z0U0aWt3IiwiY2lkIjoiMFItV0FNaHVvby1NeVEiLCJsaWQiOiJ0Ml8xY2VqYnowNHlwIiwiYWlkIjoidDJfMWNlamJ6MDR5cCIsImF0IjoxLCJsY2EiOjE3MzA4OTY1NDc0MjYsInNjcCI6ImVKeGtrZEdPdERBSWhkLUZhNV9nZjVVX20wMXRjWWFzTFFhb2szbjdEVm9jazcwN2NENHBIUDlES29xRkRDWlhncW5BQkZnVHJUREJSdVQ5bkxtM2cyaU5lOHRZc1puQ0JGbXdGRHJrbUxHc2lRUW1lSklheXhzbW9JTE55Rnl1dEdOTkxUMFFKcWhjTXJlRkhwYzJvYmtiaTU2ZEdGVzVyRHlvc1ZmbDB0akdGTFlueGpjYnF3MnB1QzZuTWtuTFF2a3NYdlRqTjlXMzl2bXpfU2EwSjhPS3F1bUIzaGxKQ0c0c2ZwaW0zZDlUazU2dEN4YTE5M3FRMnVkNjNLNTkxaXcwTzdlZjZfbHJJeG1YWTJoLUp2dDMxeS1oQTQ4OEx6UHFBRWFzNFVjWmRtUWRfbFVIVUxtZ0pHTUo0dE1JNU1ybDIzOEp0bXZUdjhidEV6OThNLUttTl96V0ROUnpDZUxRcF9IMUd3QUFfXzhRMWVUUiIsInJjaWQiOiIzMnNBdURNazFZMlJHSnZzamJYX0hEdGhMQVZiTUJpTHM4TngyaXdvUjU4IiwiZmxvIjoyfQ.c_D2OP1_D4HJWKHPX2j-VFeT34FWFLhbArcu-S_zpyvG9lb2_bP9K18wO-GSTHFLF4q0eRVPNhgILbr4aS-HRfDxdm0rEKf9x29We5jxnl5FJzJb3cNj_Oix8o6jBXsRnx_mjwqT89O_orsin9iKp5hW2uCZlKjIDQftTOwEULU-_dW6jYNGvy-yiEUk7Eo8ebbwzX9W9Q0fyiI6WyqPm15-rf7fh3-Nhjc8v5lgESxn1LXQanvKRKVvliB9bJDO3x_Y7Y1Oshb3BBpLCScTmvOaPxzFTd3-Wt_tscRtHwFZnPPqnBWgIvXPx34W_Nvq5R3s04-Qyux6z7Crhl-B5w",
+        "loid": "000000001cejbz04yp.2.1730896547426.Z0FBQUFBQnBTN0xBY0laQWdVN2JtbVd2ZmJlRXN0dDFSMU1hUFdTUUdfNVhjTXVwYVU4WUp4eXFpMjlhbk1Edkt1bTVoOUVGN3hGdWhLQmxOWjEtZnU4aXROUEM5d0pBc041dHZCNmRUWUxWRFBPYVNQZ0hNUTZ6dzlyWDM4VktGaFZ4Snlkd0U1ZXE",
+    },
+    {
+        "username": "reddit_account_6",
+        "reddit_session": "eyJhbGciOiJSUzI1NiIsImtpZCI6IlNIQTI1NjpsVFdYNlFVUEloWktaRG1rR0pVd1gvdWNFK01BSjBYRE12RU1kNzVxTXQ4IiwidHlwIjoiSldUIn0.eyJzdWIiOiJ0Ml8xY2VrZG1uc3kzIiwiZXhwIjoxNzgyMjA3MzE3LjcyMjEzLCJpYXQiOjE3NjY1Njg5MTcuNzIyMTMsImp0aSI6IkhZMUR0Q2VQb0pNVEI2ai1Ub0psTFRBWHRfWGxvUSIsImF0IjoxLCJjaWQiOiJjb29raWUiLCJsY2EiOjE3MzA4OTc1NDY4MjgsInNjcCI6ImVKeUtqZ1VFQUFEX193RVZBTGsiLCJmbG8iOjIsImFtciI6WyJwd2QiXX0.WZ_Jussf4r_4MJ_ywNrYDtZFouUO2wxG3KeX3LbJyUHY4xcveYxHMKKwLTJhHXGtHEGJ3bU1Ph3m8O6fVRJ9DaIfqkRh5crzjDMgYLarmoa8qNo3fdweHhgQ4T_u6DNE36vJjGwX8RMwotpFbfU1MstW9-wHwaWDN0gsfa8m8xLhD3nrP4qv0EvQRO-Q6glI4WdrzEOjXL1WuxxZs1li4o9dQH7DgQqqXXyCqpfb2WH9dLB9jXGxttQhnLeBS373-TGMI1hh4oM6fkRbl83oWijiobsUKg7ZparCE_hjuBx4m-mKlZRyq1g1ZzwgE-gHIWlV_uUgrZ2NwenmM8JYyg",
+        "token_v2": "eyJhbGciOiJSUzI1NiIsImtpZCI6IlNIQTI1NjpzS3dsMnlsV0VtMjVmcXhwTU40cWY4MXE2OWFFdWFyMnpLMUdhVGxjdWNZIiwidHlwIjoiSldUIn0.eyJzdWIiOiJ1c2VyIiwiZXhwIjoxNzY2NjU1MzE4LjMxODA2LCJpYXQiOjE3NjY1Njg5MTguMzE4MDYsImp0aSI6InN4NHFmZkdaNDZhMW9WeVdjaWJId3hjdG9ub2dNdyIsImNpZCI6IjBSLVdBTWh1b28tTXlRIiwibGlkIjoidDJfMWNla2RtbnN5MyIsImFpZCI6InQyXzFjZWtkbW5zeTMiLCJhdCI6MSwibGNhIjoxNzMwODk3NTQ2ODI4LCJzY3AiOiJlSnhra2RHT3REQUloZC1GYTVfZ2Y1VV9tMDF0Y1lhc0xRYW9rM243RFZvY2s3MDdjRDRwSFA5REtvcUZEQ1pYZ3FuQUJGZ1RyVERCUnVUOW5MbTNnMmlOZTh0WXNabkNCRm13RkRya21MR3NpUVFtZUpJYXl4c21vSUxOeUZ5dXRHTk5MVDBRSnFoY01yZUZIcGMyb2JrYmk1NmRHRlc1ckR5b3NWZmwwdGpHRkxZbnhqY2JxdzJwdUM2bk1rbkxRdmtzWHZUak45VzM5dm16X1NhMEo4T0txdW1CM2hsSkNHNHNmcGltM2Q5VGs1NnRDeGExOTNxUTJ1ZDYzSzU5MWl3ME83ZWY2X2xySXhtWFkyaC1KdnQzMXktaEE0ODhMelBxQUVhczRVY1pkbVFkX2xVSFVMbWdKR01KNHRNSTVNcmwyMzhKdG12VHY4YnRFejk4TS1LbU5feldETlJ6Q2VMUXBfSDFHd0FBX184UTFlVFIiLCJyY2lkIjoiRmw3czJCd1VseE9PSHRNM2RzekRIaVZkcXFIUHpOZmh4U0FjbWdGWUFpYyIsImZsbyI6Mn0.LapZgo_8uHBjY2VbbrUf5j5wv3zJ7d854JyMZtOW03gwjM-DjORf8VXWePaGQngvujO5QIIjPeZDxS0OFMWZweaQ1JbBprLcO3X7v27XFe_KJNXa6eUbOEd6jdVtW2uF2abikmioySi1xZvSzOGm7381PtYQW-qVdr8J7ULxUO1x_5BsAUb6smZ9olf4nFsX5agjth6HG1ix18hAFxCgwxNPWsciOoYc4TqmW5bEjz2pePxMD-dZMyEkB2LJ8gEftjgRF5z0jrGsRFHdMsoi8or1TbnNTk6VrKwad7XH9WBL7zr7BntCmdZhcpafkpsB2Qi958W4ZCN8pnA6vPlYYQ",
+        "loid": "000000001cekdmnsy3.2.1730897546828.Z0FBQUFBQm5pcm5BVW1PX1AtT3JNTXZTNFZWcmpncEtTRkZkWjQwZDMwMmJIUnFNY2MtQ2huUllZVHRfTWc3REhfZWRfYV9MYmRPQ1FZZUptUW90dS04UlFxVVVIZlk3ekRBSXZwQkJxelFDZU00d0lPSUJYSkxSTUF2QVJEZk9UbllGaTVUZ3Rhb24",
+    },
+    {
+        "username": "reddit_account_7",
+        "reddit_session": "eyJhbGciOiJSUzI1NiIsImtpZCI6IlNIQTI1NjpsVFdYNlFVUEloWktaRG1rR0pVd1gvdWNFK01BSjBYRE12RU1kNzVxTXQ4IiwidHlwIjoiSldUIn0.eyJzdWIiOiJ0Ml8xYm54aXNocG8wIiwiZXhwIjoxNzgyMjA3NTA0Ljg4Mzg5NywiaWF0IjoxNzY2NTY5MTA0Ljg4Mzg5NywianRpIjoiZ2VxakJCRFphR0xyWTd5S1c2aE1aSk1kalk3ZmJ3IiwiYXQiOjEsImNpZCI6ImNvb2tpZSIsImxjYSI6MTcyOTk2NDQ3NjE1Niwic2NwIjoiZUp5S2pnVUVBQURfX3dFVkFMayIsImZsbyI6MiwiYW1yIjpbInB3ZCJdfQ.BHXc3kfOzcIzjN1jAFhYIe9lgl-2qmG1qHPfMbfb-mBV1HdDtY4QRdmSufLfgeLEhpbJyncjS-MCIs6lQkVwCi2fOEOsGGN3RtiEDrztC3WN5AKN_iYK_0qHcQ-az_8yaXb2he5jbKEa8y2NFh8lJ1uvrePq397_XWUHtZp1qBhfXG2YBztvYY2SzM7aVM9ShdNcT3dY33QDDZ9WE2aYfyC6NtO1YeYfksSdswlgw6--_s25Eaobq63-3wE_3zzxouf0ZA-3fh7roBOQUtwzURgz6WWioZ3Xi8mgnve7iiwhVUxqwIbFxAAcnf-rad8WAXha7NkfPYDYSnEu2_0xbg",
+        "token_v2": "eyJhbGciOiJSUzI1NiIsImtpZCI6IlNIQTI1NjpzS3dsMnlsV0VtMjVmcXhwTU40cWY4MXE2OWFFdWFyMnpLMUdhVGxjdWNZIiwidHlwIjoiSldUIn0.eyJzdWIiOiJ1c2VyIiwiZXhwIjoxNzY2NjU1NTA2LjMxMzU0MywiaWF0IjoxNzY2NTY5MTA2LjMxMzU0MywianRpIjoieUI1QkN2UVhXV09qanpOVjZ0bjRLRDdLcTZEZlZRIiwiY2lkIjoiMFItV0FNaHVvby1NeVEiLCJsaWQiOiJ0Ml8xYm54aXNocG8wIiwiYWlkIjoidDJfMWJueGlzaHBvMCIsImF0IjoxLCJsY2EiOjE3Mjk5NjQ0NzYxNTYsInNjcCI6ImVKeGtrZEdPdERBSWhkLUZhNV9nZjVVX20wMXRjWWFzTFFhb2szbjdEVm9jazcwN2NENHBIUDlES29xRkRDWlhncW5BQkZnVHJUREJSdVQ5bkxtM2cyaU5lOHRZc1puQ0JGbXdGRHJrbUxHc2lRUW1lSklheXhzbW9JTE55Rnl1dEdOTkxUMFFKcWhjTXJlRkhwYzJvYmtiaTU2ZEdGVzVyRHlvc1ZmbDB0akdGTFlueGpjYnF3MnB1QzZuTWtuTFF2a3NYdlRqTjlXMzl2bXpfU2EwSjhPS3F1bUIzaGxKQ0c0c2ZwaW0zZDlUazU2dEN4YTE5M3FRMnVkNjNLNTkxaXcwTzdlZjZfbHJJeG1YWTJoLUp2dDMxeS1oQTQ4OEx6UHFBRWFzNFVjWmRtUWRfbFVIVUxtZ0pHTUo0dE1JNU1ybDIzOEp0bXZUdjhidEV6OThNLUttTl96V0ROUnpDZUxRcF9IMUd3QUFfXzhRMWVUUiIsInJjaWQiOiIyVEs5YjRfZmZDVXE4TkpxSlVsSmZLRE5wdjNyWDVIX0hxZV83ZlRPWE9jIiwiZmxvIjoyfQ.YiPUj0uszHbrEjPyxn0B9pKc-SjJ56oTss7TYz_piQM983Pi5n1tyT3__MYlm5sbYSewRaKk8jYQOk_orv8-51h3X40Cct0vYtT50P-gPeyHN9vP98Q7EwOq9E_DsdwVA0KMwqWZxhOjVcEd8onB9Ywx-AZIevgPDRbtIpIDwzoGauwuUXsOidffw7zM7sKESWNcWXqKqAj6pcI9z-mBAmDLgOQJGi4vRjSyYaFM-QoF9SnkBtFFTQq540EkPjGER5wdVSjTMnpuANp8qSc8WGSJ83shkANm7Yc4EHERPoX6HtmNqw0CL0Rfd9X9vUGSQHFiyLah1Qm0JM7Z9OQlYA",
+        "loid": "000000001bnxishpo0.2.1729964476156.Z0FBQUFBQm5XRk56TGNmMUFiRWRUU3NOaVR4aEw2Q3hQZDJEX3J4NGdLYV9oRHZlekxCZTNBZ1hOUVBUT1lqQy1nMVdKUDIxYW1lRzcyRWQ3VmxIamZVZTEwMkh5bF9FMV90UXNNUmZpNWlzdmdLUElUVmtaUzdTSzFESGxRTjlOQWlFSkFGbk5qSWM",
+    },
+    {
+        "username": "reddit_account_8",
+        "reddit_session": "eyJhbGciOiJSUzI1NiIsImtpZCI6IlNIQTI1NjpsVFdYNlFVUEloWktaRG1rR0pVd1gvdWNFK01BSjBYRE12RU1kNzVxTXQ4IiwidHlwIjoiSldUIn0.eyJzdWIiOiJ0Ml8xYmtoY2NrNnlwIiwiZXhwIjoxNzgyMjA4MDQ1LjE2ODM5OSwiaWF0IjoxNzY2NTY5NjQ1LjE2ODM5OSwianRpIjoiTHd4Y0psdFhzYW14MWtRc1huaGtfZ2lMUnZ5Ri13IiwiYXQiOjEsImNpZCI6ImNvb2tpZSIsImxjYSI6MTcyOTg0MzY1NjMxNiwic2NwIjoiZUp5S2pnVUVBQURfX3dFVkFMayIsImZsbyI6MiwiYW1yIjpbInB3ZCJdfQ.JVxQF7vT96oyAALJPyvMkyCFhXNcPtOw7QC_RVXRnlJLnRO2VjqCt4vFyZ3B5_gvRfAd6a0TwXBGs6tm1idc2xroCLbk_b5Pzz6ZysAA0j8yKSbokygUoHccFzRhczO7CtVB6sHpPgg2I07YkRWRNCw60IsAgtsAgpzsRIa6sKAAff2wvkECX-4YGktyN0piXTAH8_sXDjM-2rDRz6HdtAxBZAmiPAhkc6XFgQ3fFHcQRc1VGZfzavrIcB63EhIVWht7U1WiONbd2oeK2ZWAj22J4lZQmSu4cpooC-A8FLqHUQHr4bpktLIirYXMcIV1gvWkEBom_jKWN7Bvpqk1iw",
+        "token_v2": "eyJhbGciOiJSUzI1NiIsImtpZCI6IlNIQTI1NjpzS3dsMnlsV0VtMjVmcXhwTU40cWY4MXE2OWFFdWFyMnpLMUdhVGxjdWNZIiwidHlwIjoiSldUIn0.eyJzdWIiOiJ1c2VyIiwiZXhwIjoxNzY2NjU2MDQ1LjYxNjU2MywiaWF0IjoxNzY2NTY5NjQ1LjYxNjU2MywianRpIjoiUmFTZXhwVC1BRTZlRjNjMzJHMzc1OXowTkFjV3ZRIiwiY2lkIjoiMFItV0FNaHVvby1NeVEiLCJsaWQiOiJ0Ml8xYmtoY2NrNnlwIiwiYWlkIjoidDJfMWJraGNjazZ5cCIsImF0IjoxLCJsY2EiOjE3Mjk4NDM2NTYzMTYsInNjcCI6ImVKeGtrZEdPdERBSWhkLUZhNV9nZjVVX20wMXRjWWFzTFFhb2szbjdEVm9jazcwN2NENHBIUDlES29xRkRDWlhncW5BQkZnVHJUREJSdVQ5bkxtM2cyaU5lOHRZc1puQ0JGbXdGRHJrbUxHc2lRUW1lSklheXhzbW9JTE55Rnl1dEdOTkxUMFFKcWhjTXJlRkhwYzJvYmtiaTU2ZEdGVzVyRHlvc1ZmbDB0akdGTFlueGpjYnF3MnB1QzZuTWtuTFF2a3NYdlRqTjlXMzl2bXpfU2EwSjhPS3F1bUIzaGxKQ0c0c2ZwaW0zZDlUazU2dEN4YTE5M3FRMnVkNjNLNTkxaXcwTzdlZjZfbHJJeG1YWTJoLUp2dDMxeS1oQTQ4OEx6UHFBRWFzNFVjWmRtUWRfbFVIVUxtZ0pHTUo0dE1JNU1ybDIzOEp0bXZUdjhidEV6OThNLUttTl96V0ROUnpDZUxRcF9IMUd3QUFfXzhRMWVUUiIsInJjaWQiOiJQSktfMHE0bzlZZWo5RWtZbXhHeVpZNlpjQUlpSEhmVTRzTVE1bk9IN1RNIiwiZmxvIjoyfQ.KiohXal3gTzWUNI6agQ8ItFGB80VJixuSxoJEEEvrxLCWpMnc5weCIHoxqo5ur3PqXjFie7RYazdgOJ2AV5uQkoPclJT3KhKH9vt9nSOHqLTcMBlMsKYjOcqVkQ3kjqmaw6TN-1QFEJpPlsGhCPyn8sW5rBwuMOczh_pu7yjUWL10LXwv5Zm3Sr58Que84GKlgZL9c3gVSFl5EC9_nRYTN3UsN2W7ydWgbwa843ICuSDFGV5bTolRfNzIULAXfvLQzfnPQtRA3HjbujjnhuA-6g4ZhaXO6sf1d3GNALp_-xRsRNziKY2TPCoA8xxqwGePnOhtJG1mL25m6bPnVVVyw",
+        "loid": "000000001bkhcck6yp.2.1729843656316.Z0FBQUFBQm5HMUhJRGM1Y214YjVWbGxNSDBJOUZqUWpOV0oxeUNJejF4T2lEcU1VQ0plMFVPMWQxR2hEd2pxaWZBRUhDSGQ0RkJ5NlY3UmNVYVFxUEdqVnVOSHVmVWNocFhPQTNXOGg3bHFXclJEMGlNUy1FQnBKZE9BcEdWYWUwR2d4d2JHRnFjd0Q",
+    },
+    {
+        "username": "reddit_account_9",
+        "reddit_session": "eyJhbGciOiJSUzI1NiIsImtpZCI6IlNIQTI1NjpsVFdYNlFVUEloWktaRG1rR0pVd1gvdWNFK01BSjBYRE12RU1kNzVxTXQ4IiwidHlwIjoiSldUIn0.eyJzdWIiOiJ0Ml8xYmRxczA0emVvIiwiZXhwIjoxNzgyMjA4MzEyLjMzODAyOSwiaWF0IjoxNzY2NTY5OTEyLjMzODAyOSwianRpIjoiVXBlMlliTWVSVnpNZEhVU0U3Y2xxaXpXaVpMblNBIiwiYXQiOjEsImNpZCI6ImNvb2tpZSIsImxjYSI6MTcyOTYwNzU4OTU2Niwic2NwIjoiZUp5S2pnVUVBQURfX3dFVkFMayIsImZsbyI6MiwiYW1yIjpbInB3ZCJdfQ.DGQ-YT9h9VKI1RD4O9yRAI_Nz9jHgezIEyVNqrQjj8CEGTD4zAHJrNzXk7lrRRgHq4JLTWViNbr4IRLVDwZE9wvd-4Hrvh3u-8MYSMN0ALTY99jzcInMOQi4WOhjVulbICbs8SumF9vF9bGU-ZZPaFXKo_oX_95GP2SO1nR5bdWMOYxw0B4FvZE8bbiU_fyXA3uPvcHy9Uh034Ksm7A6ELTGqDskuTy-Oa_1MlvPjZ4yVgVez6dzV1ahgElCVkQHeYpOP8wpcK-wysVwHEr-2nvt5yLWNT9sWynkIukJ2TLksW8evBtC4TYuJ1k1o6Y4X_cjf-bFujFEetzm4iOzcg",
+        "token_v2": "eyJhbGciOiJSUzI1NiIsImtpZCI6IlNIQTI1NjpzS3dsMnlsV0VtMjVmcXhwTU40cWY4MXE2OWFFdWFyMnpLMUdhVGxjdWNZIiwidHlwIjoiSldUIn0.eyJzdWIiOiJ1c2VyIiwiZXhwIjoxNzY2NjU2MzEzLjk1ODEyNSwiaWF0IjoxNzY2NTY5OTEzLjk1ODEyNSwianRpIjoiRzNGblNld0VNenFlWFBMamU2NGhzUFJuREo4aXpRIiwiY2lkIjoiMFItV0FNaHVvby1NeVEiLCJsaWQiOiJ0Ml8xYmRxczA0emVvIiwiYWlkIjoidDJfMWJkcXMwNHplbyIsImF0IjoxLCJsY2EiOjE3Mjk2MDc1ODk1NjYsInNjcCI6ImVKeGtrZEdPdERBSWhkLUZhNV9nZjVVX20wMXRjWWFzTFFhb2szbjdEVm9jazcwN2NENHBIUDlES29xRkRDWlhncW5BQkZnVHJUREJSdVQ5bkxtM2cyaU5lOHRZc1puQ0JGbXdGRHJrbUxHc2lRUW1lSklheXhzbW9JTE55Rnl1dEdOTkxUMFFKcWhjTXJlRkhwYzJvYmtiaTU2ZEdGVzVyRHlvc1ZmbDB0akdGTFlueGpjYnF3MnB1QzZuTWtuTFF2a3NYdlRqTjlXMzl2bXpfU2EwSjhPS3F1bUIzaGxKQ0c0c2ZwaW0zZDlUazU2dEN4YTE5M3FRMnVkNjNLNTkxaXcwTzdlZjZfbHJJeG1YWTJoLUp2dDMxeS1oQTQ4OEx6UHFBRWFzNFVjWmRtUWRfbFVIVUxtZ0pHTUo0dE1JNU1ybDIzOEp0bXZUdjhidEV6OThNLUttTl96V0ROUnpDZUxRcF9IMUd3QUFfXzhRMWVUUiIsInJjaWQiOiJRdUlOOTV2UlJqVmZ0bmNOQlRwZEdhUTFieVVGT3lMZkdmRFk4Uk1WZkFrIiwiZmxvIjoyfQ.ERtNSSDA-SOabUdcD6qDdHNnkUuzkqAP2-eQ4kHhdz1hq0x9HlW31j_5o_teggi6OHDHwQ4bDlwPZZJhipdBv5-bMxMDeCD9NbCIjWFAVV1yhhrCeRPkDqoeTXjN6rs0-5NCUdE2B2_WNuE-UEjv6S97ogyAfoIxzfnxsinmxlWSFQahn6p6CL4Lr5eewWHT5GtxRClJe5xjjeKjDAtxFOoA0wAjHoRq7L1YTI6AEBl16fKoeCeZxZMVKNu7ZzCzd_Zvm6fME46S716JmDUsha3MWUxka7zQOmCApdQKz8OqH7YDf0Xxgk801kLlHhctLX2O0_zgqU8ndHpAMQnGkw",
+        "loid": "000000001bdqs04zeo.2.1729607589566.Z0FBQUFBQnBTN2U1ei1tSkJuNDBKRTI3LXdYMkJjWG1McHYtOFJsUVlibHQxellKOERINTRremVGS212OGpLNnhlU3JyUGxTMnc1MS1kekdUTmhNU1praGxYMFVtODBsN2pxOE53SjNqLS0xU3pTSWhjXzhwUm9QUWF1dDBzb0FpM0FEbFdHTk56eVY",
+    },
+    {
+        "username": "reddit_account_10",
+        "reddit_session": "eyJhbGciOiJSUzI1NiIsImtpZCI6IlNIQTI1NjpsVFdYNlFVUEloWktaRG1rR0pVd1gvdWNFK01BSjBYRE12RU1kNzVxTXQ4IiwidHlwIjoiSldUIn0.eyJzdWIiOiJ0Ml8xYmRyZWxycWp4IiwiZXhwIjoxNzgyMjA4NDQyLjQxODc3LCJpYXQiOjE3NjY1NzAwNDIuNDE4NzcsImp0aSI6IjlNdmlUOHNSUWdfeUJLUVlWS1d4dF9jcXNScDdLdyIsImF0IjoxLCJjaWQiOiJjb29raWUiLCJsY2EiOjE3Mjk2MDgyMjIwMjMsInNjcCI6ImVKeUtqZ1VFQUFEX193RVZBTGsiLCJmbG8iOjIsImFtciI6WyJwd2QiXX0.dls5nqInvVKwxAPTTpKKM3jEiNZnTNIXzWmqKGXtiab_0yiceQvJPDWyAXoxElOQGw4H_76yYl90Exw5DNg_wmkP9s3W9eBY8hLQcDXncVPNcHm3sa46IybFQ2q35C91rwzmd1iyBTV4oOhaKb4TYqUJFX0rW9qvqAXepBokty0ASc6fTvgOZdoO9vnPf3GBm9enIY9wrIvhaSJ8bfu-piipl6DUtrzUxs08wd-1qUPN9h7q4Rbx5xo6hB-40WlJuEsd3nZbAa_NcgtyaY4jTVtY-UwO2HEQ4zpNtEHg2PjjezCjPs7_IxZOA9NaMjN2EpxCa04Trsf0XvZQgd5rSQ",
+        "token_v2": "eyJhbGciOiJSUzI1NiIsImtpZCI6IlNIQTI1NjpzS3dsMnlsV0VtMjVmcXhwTU40cWY4MXE2OWFFdWFyMnpLMUdhVGxjdWNZIiwidHlwIjoiSldUIn0.eyJzdWIiOiJ1c2VyIiwiZXhwIjoxNzY2NjU2NDQzLjQzNjMyNywiaWF0IjoxNzY2NTcwMDQzLjQzNjMyNiwianRpIjoiYlNjRXd4OXhhZXpQVXZYQVFkaFBvbWdkQUFTLWxRIiwiY2lkIjoiMFItV0FNaHVvby1NeVEiLCJsaWQiOiJ0Ml8xYmRyZWxycWp4IiwiYWlkIjoidDJfMWJkcmVscnFqeCIsImF0IjoxLCJsY2EiOjE3Mjk2MDgyMjIwMjMsInNjcCI6ImVKeGtrZEdPdERBSWhkLUZhNV9nZjVVX20wMXRjWWFzTFFhb2szbjdEVm9jazcwN2NENHBIUDlES29xRkRDWlhncW5BQkZnVHJUREJSdVQ5bkxtM2cyaU5lOHRZc1puQ0JGbXdGRHJrbUxHc2lRUW1lSklheXhzbW9JTE55Rnl1dEdOTkxUMFFKcWhjTXJlRkhwYzJvYmtiaTU2ZEdGVzVyRHlvc1ZmbDB0akdGTFlueGpjYnF3MnB1QzZuTWtuTFF2a3NYdlRqTjlXMzl2bXpfU2EwSjhPS3F1bUIzaGxKQ0c0c2ZwaW0zZDlUazU2dEN4YTE5M3FRMnVkNjNLNTkxaXcwTzdlZjZfbHJJeG1YWTJoLUp2dDMxeS1oQTQ4OEx6UHFBRWFzNFVjWmRtUWRfbFVIVUxtZ0pHTUo0dE1JNU1ybDIzOEp0bXZUdjhidEV6OThNLUttTl96V0ROUnpDZUxRcF9IMUd3QUFfXzhRMWVUUiIsInJjaWQiOiIwTy1tSk1rbmtpb2t4ek1US2JLM01wSkQ4UU1kTU53aHJnbk9iTnkwZ0JNIiwiZmxvIjoyfQ.CFMQF7iOeC3klpmWARVle3dx5FwEAx1HOkt2impGWEZyqM3PeuOcYlm0uQVkfk014toDrNYSGGu4Zlxzfkz0U_-i2sQ0n2x0OdqpuJl5GIOld3aqPz6fqpjrywP2owVQ-KUPbkt9CSWC9V2AR9tI5SxpBOeTn-O7xYV54nw2jY0TQDnwCsG8CzHuValBhWH_jhIVCpvv8JlpQY_Gv62EFeB_Nf-uUFKLx51322FbSJ_i-FWIOM9GI54wQrlDlAsHOVbX_tUjGumZOeKjUeeNjFUljm7s58CR8VmgbQOlMs03b50DEu8-M3_vh7z7SoD_7eZDL7ZQ8EA5Lwh3c2x2_g",
+        "loid": "000000001bdrelrqjx.2.1729608222023.Z0FBQUFBQm5GN29lVzZjRFpyMEl0dGZJQ3daV1BwV1o4WE5DTHhRcnR6X2VBaE82dDdFSVRaY3pBRVBITm1JcXFxTUlaN3RyS0c5MEh3bkFfSGY2dHlMUGFJb3hCLU5Md2RlS0U2cnpsQTA5SlpLeGNiT1VRT1B2cTRFYllWbXpxOXdoYkM5WEhfZGs",
+    },
+]
 
 # =============================================================================
-# BROWSER POOL SETTINGS (for parallel scraping)
+# BROWSER POOL SETTINGS
 # =============================================================================
-# Number of browser contexts to run in parallel
-BROWSER_POOL_SIZE = int(os.getenv("BROWSER_POOL_SIZE", "5"))
-
-# Number of subreddits to process concurrently
-CONCURRENT_SUBREDDITS = int(os.getenv("CONCURRENT_SUBREDDITS", "5"))
+BROWSER_POOL_SIZE = 10  # Match number of accounts
+CONCURRENT_SUBREDDITS = 10  # Process 10 subs in parallel
+PAGE_TIMEOUT_MS = 30000  # 30 second timeout (SOAX should be fast)
 
 # =============================================================================
 # SCRAPER SETTINGS
 # =============================================================================
-# Minimum subscribers to scrape a subreddit
-CRAWLER_MIN_SUBSCRIBERS = int(os.getenv("CRAWLER_MIN_SUBSCRIBERS", "5000"))
-
-# Batch size per worker cycle
-BATCH_SIZE = int(os.getenv("BATCH_SIZE", "20"))
-
-# Delay between requests (seconds) - reduced for parallel processing
-DELAY_MIN = float(os.getenv("DELAY_MIN", "1.0"))
-DELAY_MAX = float(os.getenv("DELAY_MAX", "3.0"))
-
-# Rotate IP every N subreddits - less important with Brightdata auto-rotation
-ROTATE_EVERY = int(os.getenv("ROTATE_EVERY", "20"))
-
-# Wait time when queue is empty (seconds)
-IDLE_WAIT = int(os.getenv("IDLE_WAIT", "120"))
-
-# Run browser in headless mode
-HEADLESS = os.getenv("HEADLESS", "true").lower() == "true"
-
+CRAWLER_MIN_SUBSCRIBERS = 5000
+BATCH_SIZE = 20
+DELAY_MIN = 1.0
+DELAY_MAX = 3.0
+ROTATE_EVERY = 20
+IDLE_WAIT = 120
+HEADLESS = True

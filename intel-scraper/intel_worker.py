@@ -12,14 +12,13 @@ import argparse
 import logging
 import random
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 
 from supabase_client import SupabaseClient
 from subreddit_intel_scraper import SubredditIntelScraper
 from stealth_browser import BrowserPool
 from config import (
     PROXY_URL,
-    BRIGHTDATA_PROXY,
     CRAWLER_MIN_SUBSCRIBERS, 
     BATCH_SIZE, 
     IDLE_WAIT,
@@ -67,8 +66,8 @@ class ParallelIntelWorker:
         self.supabase = SupabaseClient()
         self.browser_pool: BrowserPool = None
         
-        # Use Brightdata if available
-        self.proxy = BRIGHTDATA_PROXY or PROXY_URL
+        # Use SOAX proxy
+        self.proxy = PROXY_URL
         
         self.stats = {
             "batches_completed": 0,
@@ -85,7 +84,7 @@ class ParallelIntelWorker:
             idle_wait: Seconds to wait when no work is available
         """
         idle_wait = idle_wait or IDLE_WAIT
-        self.stats["start_time"] = datetime.utcnow()
+        self.stats["start_time"] = datetime.now(timezone.utc)
         
         logger.info(f"[Worker {self.worker_id}] ========================================")
         logger.info(f"[Worker {self.worker_id}] Parallel Intel Worker starting...")
@@ -94,7 +93,7 @@ class ParallelIntelWorker:
         logger.info(f"[Worker {self.worker_id}] Concurrent subreddits: {CONCURRENT_SUBREDDITS}")
         logger.info(f"[Worker {self.worker_id}] Min subscribers: {self.min_subscribers}")
         logger.info(f"[Worker {self.worker_id}] Headless: {self.headless}")
-        logger.info(f"[Worker {self.worker_id}] Proxy: {'Brightdata' if BRIGHTDATA_PROXY else 'Legacy' if self.proxy else 'None'}")
+        logger.info(f"[Worker {self.worker_id}] Proxy: {'SOAX' if self.proxy else 'None'}")
         logger.info(f"[Worker {self.worker_id}] ========================================")
         
         # Initialize browser pool
@@ -289,7 +288,7 @@ class ParallelIntelWorker:
             
             # Add metadata
             data["display_name"] = f"r/{subreddit_name}"
-            data["last_scraped_at"] = datetime.utcnow().isoformat()
+            data["last_scraped_at"] = datetime.now(timezone.utc).isoformat()
             data["scrape_status"] = "completed"
             
             logger.info(
@@ -306,7 +305,7 @@ class ParallelIntelWorker:
     
     def _log_stats(self):
         """Log current worker statistics."""
-        runtime = datetime.utcnow() - self.stats["start_time"]
+        runtime = datetime.now(timezone.utc) - self.stats["start_time"]
         hours = runtime.total_seconds() / 3600
         
         rate = self.stats["total_scraped"] / hours if hours > 0 else 0
@@ -355,9 +354,9 @@ class IntelWorker:
     async def run(self, idle_wait: int = None):
         """Main worker loop - runs continuously."""
         idle_wait = idle_wait or IDLE_WAIT
-        self.stats["start_time"] = datetime.utcnow()
+        self.stats["start_time"] = datetime.now(timezone.utc)
         
-        proxy = BRIGHTDATA_PROXY or PROXY_URL
+        proxy = PROXY_URL
         
         logger.info(f"[Worker {self.worker_id}] ========================================")
         logger.info(f"[Worker {self.worker_id}] Intel Worker starting (legacy mode)...")
@@ -414,7 +413,7 @@ class IntelWorker:
                 await asyncio.sleep(60)
     
     def _log_stats(self):
-        runtime = datetime.utcnow() - self.stats["start_time"]
+        runtime = datetime.now(timezone.utc) - self.stats["start_time"]
         hours = runtime.total_seconds() / 3600
         rate = self.stats["total_scraped"] / hours if hours > 0 else 0
         
@@ -430,7 +429,7 @@ class IntelWorker:
 async def run_single_batch(subreddits: list[str], headless: bool = True):
     """Run a single batch for testing."""
     supabase = SupabaseClient()
-    proxy = BRIGHTDATA_PROXY or PROXY_URL
+    proxy = PROXY_URL
     
     async with SubredditIntelScraper(
         supabase_client=supabase,
