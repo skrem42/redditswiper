@@ -234,8 +234,8 @@ export async function getStats(): Promise<Stats> {
   ] = await Promise.all([
     supabase.from("reddit_leads").select("*", { count: "exact", head: true }),
     supabase.from("reddit_posts").select("*", { count: "exact", head: true }),
-    // Count from nsfw_subreddit_intel (intel-analyzed subs) instead of subreddits table
-    supabase.from("nsfw_subreddit_intel").select("*", { count: "exact", head: true }).eq("scrape_status", "completed"),
+    // Count from nsfw_subreddit_intel - show ALL subreddits regardless of scrape status
+    supabase.from("nsfw_subreddit_intel").select("*", { count: "exact", head: true }),
     supabase.from("reddit_leads").select("*", { count: "exact", head: true }).eq("status", "pending"),
     supabase.from("reddit_leads").select("*", { count: "exact", head: true }).eq("status", "approved"),
     supabase.from("reddit_leads").select("*", { count: "exact", head: true }).eq("status", "rejected"),
@@ -266,7 +266,7 @@ export interface Subreddit {
 
 export async function getSubreddits(): Promise<Subreddit[]> {
   // Fetch from nsfw_subreddit_intel (where intel worker puts analyzed subs)
-  // Show all completed intel scrapes with pagination to bypass 1k limit
+  // Show ALL subreddits regardless of scrape_status with pagination to bypass 1k limit
   const allData: any[] = [];
   const pageSize = 1000;
   let offset = 0;
@@ -276,7 +276,7 @@ export async function getSubreddits(): Promise<Subreddit[]> {
     const { data, error } = await supabase
       .from("nsfw_subreddit_intel")
       .select("*")
-      .eq("scrape_status", "completed")
+      // Removed .eq("scrape_status", "completed") to show all subreddits
       .order("subscribers", { ascending: false, nullsFirst: false })
       .range(offset, offset + pageSize - 1);
 
@@ -296,12 +296,14 @@ export async function getSubreddits(): Promise<Subreddit[]> {
   }
 
   // Map nsfw_subreddit_intel fields to Subreddit interface
+  // Include scrape_status so UI can show which are still being scraped
   return allData.map(sub => ({
     id: sub.id,
     name: sub.subreddit_name,
     display_name: sub.display_name || `r/${sub.subreddit_name}`,
     subscribers: sub.subscribers || 0,
     is_nsfw: true, // Intel table only has NSFW subs
+    status: sub.scrape_status, // Include status for UI to show scraping progress
   } as any));
 }
 
@@ -803,8 +805,8 @@ export async function getSubredditIntel(
 ): Promise<SubredditIntel[]> {
   let query = supabase
     .from("nsfw_subreddit_intel")
-    .select("*")
-    .eq("scrape_status", "completed");
+    .select("*");
+    // Removed .eq("scrape_status", "completed") to show all subreddits
 
   // Apply filters
   if (filters.minSubscribers) {
@@ -854,6 +856,7 @@ export async function getSubredditIntelStats(): Promise<{
   total: number;
   completed: number;
   pending: number;
+  processing: number;
   failed: number;
   avgCompetitionScore: number | null;
 }> {
@@ -863,7 +866,7 @@ export async function getSubredditIntelStats(): Promise<{
 
   if (error) {
     console.error("Error fetching intel stats:", error);
-    return { total: 0, completed: 0, pending: 0, failed: 0, avgCompetitionScore: null };
+    return { total: 0, completed: 0, pending: 0, processing: 0, failed: 0, avgCompetitionScore: null };
   }
 
   const items = data || [];
@@ -880,6 +883,7 @@ export async function getSubredditIntelStats(): Promise<{
     total: items.length,
     completed: completed.length,
     pending: items.filter(d => d.scrape_status === "pending").length,
+    processing: items.filter(d => d.scrape_status === "processing").length,
     failed: items.filter(d => d.scrape_status === "failed").length,
     avgCompetitionScore: avgCompetition,
   };

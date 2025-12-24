@@ -150,7 +150,11 @@ export function SubredditSelector({
                 const count = pendingCounts[sub.id] || 0;
                 const isExcluded = excludedSubreddits.has(sub.id);
                 // Check if sub is being actively crawled (from getSubreddits query that includes processing subs)
-                const isActive = (sub as any).status === "processing";
+                const status = (sub as any).status;
+                const isProcessing = status === "processing";
+                const isPending = status === "pending";
+                const isCompleted = status === "completed";
+                const isFailed = status === "failed";
                 
                 return (
                   <button
@@ -158,7 +162,7 @@ export function SubredditSelector({
                     onClick={() => toggleSubreddit(sub.id)}
                     className={`w-full px-3 py-2.5 text-left hover:bg-secondary/50 transition-colors flex items-center gap-3 ${
                       isExcluded ? "opacity-50" : ""
-                    } ${isActive ? "bg-blue-500/10" : ""}`}
+                    } ${isProcessing ? "bg-blue-500/10" : ""} ${isPending ? "bg-amber-500/5" : ""}`}
                   >
                     {/* Checkbox */}
                     <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 ${
@@ -175,17 +179,34 @@ export function SubredditSelector({
                         <span className={`font-medium truncate ${isExcluded ? "line-through" : ""}`}>
                           r/{sub.name}
                         </span>
-                        {isActive && (
+                        {isProcessing && (
                           <span className="flex items-center gap-1 px-1.5 py-0.5 bg-blue-500/20 text-blue-400 rounded text-[9px] font-medium">
                             <span className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse" />
-                            ACTIVE
+                            SCRAPING
+                          </span>
+                        )}
+                        {isPending && (
+                          <span className="flex items-center gap-1 px-1.5 py-0.5 bg-amber-500/20 text-amber-400 rounded text-[9px] font-medium">
+                            <span className="w-1.5 h-1.5 bg-amber-400 rounded-full" />
+                            QUEUED
+                          </span>
+                        )}
+                        {isFailed && (
+                          <span className="flex items-center gap-1 px-1.5 py-0.5 bg-red-500/20 text-red-400 rounded text-[9px] font-medium">
+                            FAILED
                           </span>
                         )}
                       </div>
-                      {sub.subscribers > 0 && (
+                      {sub.subscribers > 0 ? (
                         <span className="text-[10px] text-muted-foreground">
                           {sub.subscribers.toLocaleString()} members
                         </span>
+                      ) : (
+                        !isCompleted && (
+                          <span className="text-[10px] text-muted-foreground italic">
+                            Awaiting data...
+                          </span>
+                        )
                       )}
                     </div>
 

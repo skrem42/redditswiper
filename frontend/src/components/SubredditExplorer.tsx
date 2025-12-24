@@ -450,6 +450,7 @@ export function SubredditExplorer() {
     total: 0,
     completed: 0,
     pending: 0,
+    processing: 0,
     failed: 0,
     avgCompetitionScore: null as number | null,
   });
@@ -632,14 +633,18 @@ export function SubredditExplorer() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-5 gap-4">
         <div className="bg-card rounded-xl p-4 border border-border">
           <div className="text-2xl font-bold text-primary">{stats.completed}</div>
-          <div className="text-sm text-muted-foreground">Analyzed Subreddits</div>
+          <div className="text-sm text-muted-foreground">Completed</div>
         </div>
         <div className="bg-card rounded-xl p-4 border border-border">
-          <div className="text-2xl font-bold text-yellow-400">{stats.pending}</div>
-          <div className="text-sm text-muted-foreground">Pending Analysis</div>
+          <div className="text-2xl font-bold text-blue-400">{stats.processing}</div>
+          <div className="text-sm text-muted-foreground">Scraping Now</div>
+        </div>
+        <div className="bg-card rounded-xl p-4 border border-border">
+          <div className="text-2xl font-bold text-amber-400">{stats.pending}</div>
+          <div className="text-sm text-muted-foreground">Queued</div>
         </div>
         <div className="bg-card rounded-xl p-4 border border-border">
           <div className="text-2xl font-bold text-red-400">{stats.failed}</div>

@@ -107,6 +107,46 @@ body {
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
 }
 
+/* Mobile optimizations */
+@media (max-width: 768px) {
+  /* Prevent pull-to-refresh interfering with swipe */
+  html, body {
+    overscroll-behavior-y: contain;
+  }
+  
+  /* Better touch targets */
+  button, a {
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  /* Smooth scrolling */
+  .overflow-y-auto {
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* Touch-friendly card swipe */
+.touch-pan-y {
+  touch-action: pan-y;
+}
+
+/* Hide scrollbar on mobile horizontal scroll */
+.overflow-x-auto::-webkit-scrollbar {
+  display: none;
+}
+.overflow-x-auto {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Line clamp utility */
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 
 
 

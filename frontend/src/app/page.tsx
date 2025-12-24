@@ -405,42 +405,43 @@ export default function Home() {
   const showSwiper = currentFilter === "pending";
 
   return (
-    <main className="min-h-screen p-6 md:p-8 max-w-4xl mx-auto">
-      {/* Header */}
-      <header className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-3xl font-bold gradient-text flex items-center gap-2">
-            <Zap className="text-primary" />
-            Reddit Scraper
+    <main className="min-h-screen p-3 md:p-6 lg:p-8 max-w-4xl mx-auto">
+      {/* Header - Compact on mobile */}
+      <header className="flex items-center justify-between mb-3 md:mb-6 gap-2 flex-wrap">
+        <div className="flex-shrink-0">
+          <h1 className="text-xl md:text-3xl font-bold gradient-text flex items-center gap-2">
+            <Zap className="text-primary w-5 h-5 md:w-6 md:h-6" />
+            <span className="hidden sm:inline">Reddit Scraper</span>
+            <span className="sm:hidden">Leads</span>
           </h1>
-          <p className="text-muted-foreground mt-1">
+          <p className="text-muted-foreground text-xs md:text-base mt-0.5 md:mt-1 hidden md:block">
             Discover leads and analyze subreddits
           </p>
         </div>
         
-        {/* Main Navigation Tabs */}
-        <div className="flex items-center gap-2 bg-secondary rounded-xl p-1">
+        {/* Main Navigation Tabs - Smaller on mobile */}
+        <div className="flex items-center gap-1 md:gap-2 bg-secondary rounded-lg md:rounded-xl p-0.5 md:p-1">
           <button
             onClick={() => setMainView("leads")}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
+            className={`flex items-center gap-1 md:gap-2 px-2 md:px-4 py-1.5 md:py-2 rounded-md md:rounded-lg font-medium transition-all text-sm md:text-base ${
               mainView === "leads"
                 ? "bg-primary text-primary-foreground"
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            <Users size={18} />
-            Leads
+            <Users size={16} className="md:w-[18px] md:h-[18px]" />
+            <span className="hidden xs:inline">Leads</span>
           </button>
           <button
             onClick={() => setMainView("subreddits")}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
+            className={`flex items-center gap-1 md:gap-2 px-2 md:px-4 py-1.5 md:py-2 rounded-md md:rounded-lg font-medium transition-all text-sm md:text-base ${
               mainView === "subreddits"
                 ? "bg-primary text-primary-foreground"
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            <BarChart3 size={18} />
-            Subreddits
+            <BarChart3 size={16} className="md:w-[18px] md:h-[18px]" />
+            <span className="hidden xs:inline">Subs</span>
           </button>
         </div>
         
@@ -448,11 +449,11 @@ export default function Home() {
           <button
             onClick={handleRefresh}
             disabled={isRefreshing}
-            className="p-3 rounded-xl bg-secondary hover:bg-secondary/80 text-foreground transition-all disabled:opacity-50"
+            className="p-2 md:p-3 rounded-lg md:rounded-xl bg-secondary hover:bg-secondary/80 text-foreground transition-all disabled:opacity-50"
             title="Refresh data"
           >
             <RefreshCw
-              size={20}
+              size={18}
               className={isRefreshing ? "animate-spin" : ""}
             />
           </button>
@@ -467,9 +468,9 @@ export default function Home() {
       {/* Leads View */}
       {mainView === "leads" && (
         <>
-          {/* Filters row */}
-          <div className="relative z-30 flex items-center justify-between gap-4 mb-6 flex-wrap">
-            <div className="flex items-center gap-4">
+          {/* Filters row - Hidden when swiping on mobile for more space */}
+          <div className="relative z-30 flex items-center justify-between gap-2 md:gap-4 mb-3 md:mb-6 flex-wrap">
+            <div className="flex items-center gap-2 md:gap-4">
               <SubredditSelector
                 subreddits={subreddits}
                 excludedSubreddits={excludedSubreddits}
@@ -480,13 +481,13 @@ export default function Home() {
                 pendingCounts={subredditPendingCounts}
               />
               {excludedSubreddits.size > 0 && (
-                <span className="text-sm text-muted-foreground">
+                <span className="hidden md:inline text-sm text-muted-foreground">
                   Hiding {excludedSubreddits.size} subreddit{excludedSubreddits.size > 1 ? "s" : ""}
                 </span>
               )}
             </div>
             
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 md:gap-3">
               {/* Sort Selector - only show for pending leads */}
               {currentFilter === "pending" && (
                 <SortSelector currentSort={sortBy} onSortChange={setSortBy} />
@@ -505,7 +506,7 @@ export default function Home() {
           />
 
           {/* Main content area */}
-          <div className="relative min-h-[600px]">
+          <div className="relative min-h-[400px] md:min-h-[600px]">
         {isLoading ? (
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="text-center space-y-4">
@@ -518,13 +519,13 @@ export default function Home() {
           <>
             {sortedLeads.length > 0 ? (
               <>
-                {/* Card stack indicator */}
-                <div className="text-center mb-4 text-sm text-muted-foreground">
-                  {currentIndex + 1} of {sortedLeads.length} pending leads
+                {/* Card stack indicator - smaller on mobile */}
+                <div className="text-center mb-2 md:mb-4 text-xs md:text-sm text-muted-foreground">
+                  {currentIndex + 1} of {sortedLeads.length} pending
                 </div>
 
-                {/* Swipe cards */}
-                <div className="relative h-[75vh] min-h-[600px]">
+                {/* Swipe cards - full height on mobile, constrained on desktop */}
+                <div className="relative h-[calc(100vh-200px)] md:h-[70vh] md:min-h-[550px]">
                   <AnimatePresence mode="popLayout">
                     {currentLead && (
                       <SwipeCard
@@ -538,8 +539,8 @@ export default function Home() {
                   </AnimatePresence>
                 </div>
 
-                {/* Keyboard hints and undo button */}
-                <div className="flex items-center justify-center gap-4 mt-4">
+                {/* Keyboard hints and undo button - hidden on mobile (buttons are in card) */}
+                <div className="hidden md:flex items-center justify-center gap-4 mt-4">
                   {/* Undo button */}
                   <button
                     onClick={handleUndo}
@@ -575,6 +576,24 @@ export default function Home() {
                       Undo
                     </span>
                   </div>
+                </div>
+
+                {/* Mobile undo button - fixed at bottom */}
+                <div className="md:hidden fixed bottom-4 left-1/2 -translate-x-1/2 z-30">
+                  <button
+                    onClick={handleUndo}
+                    disabled={swipeHistory.length === 0}
+                    className="flex items-center gap-2 px-4 py-2 rounded-full bg-secondary/90 backdrop-blur text-foreground transition-all disabled:opacity-30 disabled:cursor-not-allowed shadow-lg"
+                    title="Undo last swipe"
+                  >
+                    <Undo2 size={16} />
+                    <span className="text-sm">Undo</span>
+                    {swipeHistory.length > 0 && (
+                      <span className="text-xs text-muted-foreground">
+                        ({swipeHistory.length})
+                      </span>
+                    )}
+                  </button>
                 </div>
               </>
             ) : (

@@ -16,13 +16,22 @@ export function SwipeCard({ lead, onSwipe, onSuperLike, isActive }: SwipeCardPro
   const [exitDirection, setExitDirection] = useState<"left" | "right" | "up" | null>(null);
   const [carouselIndex, setCarouselIndex] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const x = useMotionValue(0);
   const rotate = useTransform(x, [-300, 0, 300], [-15, 0, 15]);
   const opacity = useTransform(x, [-300, -100, 0, 100, 300], [0.5, 1, 1, 1, 0.5]);
 
   // Overlay indicators
-  const rejectOpacity = useTransform(x, [-150, 0], [1, 0]);
-  const approveOpacity = useTransform(x, [0, 150], [0, 1]);
+  const rejectOpacity = useTransform(x, [-100, 0], [1, 0]);
+  const approveOpacity = useTransform(x, [0, 100], [0, 1]);
+
+  // Detect mobile
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
 
   // Extract and analyze links - check bio, extracted_links, and post content
   const linkAnalysis = useMemo(() => {
@@ -96,8 +105,8 @@ export function SwipeCard({ lead, onSwipe, onSuperLike, isActive }: SwipeCardPro
     });
   }, [mediaUrls]);
 
-  // Calculate carousel pages (3 images per page)
-  const IMAGES_PER_PAGE = 3;
+  // Calculate carousel pages (3 images per page on desktop, 2 on mobile)
+  const IMAGES_PER_PAGE = isMobile ? 2 : 3;
   const totalPages = Math.ceil(mediaUrls.length / IMAGES_PER_PAGE);
   const currentPageImages = mediaUrls.slice(
     carouselIndex * IMAGES_PER_PAGE, 
@@ -157,11 +166,14 @@ export function SwipeCard({ lead, onSwipe, onSuperLike, isActive }: SwipeCardPro
   }, [lead.account_created_at, lead.total_posts, lead.posting_frequency, lead.reddit_posts]);
 
   const handleDragEnd = (_: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
-    const threshold = 150;
-    if (info.offset.x > threshold) {
+    // Lower threshold for mobile - also consider velocity
+    const threshold = isMobile ? 80 : 150;
+    const velocityThreshold = 300;
+    
+    if (info.offset.x > threshold || info.velocity.x > velocityThreshold) {
       setExitDirection("right");
       onSwipe("right");
-    } else if (info.offset.x < -threshold) {
+    } else if (info.offset.x < -threshold || info.velocity.x < -velocityThreshold) {
       setExitDirection("left");
       onSwipe("left");
     }
@@ -226,18 +238,46 @@ export function SwipeCard({ lead, onSwipe, onSuperLike, isActive }: SwipeCardPro
   return (
     <>
       <motion.div
-        className="absolute inset-0 flex items-start justify-center pt-4"
+        className="absolute inset-0 flex flex-col md:items-start md:justify-start md:pt-4"
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={exitDirection ? exitVariants[exitDirection] : { opacity: 0, scale: 0.8 }}
         transition={{ duration: 0.3 }}
       >
+        {/* Mobile: Fixed action buttons at top */}
+        <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-gradient-to-b from-background via-background to-transparent pb-6 pt-2 px-4">
+          <div className="flex items-center justify-center gap-6">
+            <button
+              onClick={() => handleButtonSwipe("left")}
+              className="w-14 h-14 rounded-full bg-destructive/20 border-2 border-destructive text-destructive flex items-center justify-center active:scale-95 transition-transform shadow-lg"
+            >
+              <X size={26} strokeWidth={3} />
+            </button>
+            
+            {onSuperLike && (
+              <button
+                onClick={handleSuperLike}
+                className="w-12 h-12 rounded-full bg-amber-500/20 border-2 border-amber-500 text-amber-500 flex items-center justify-center active:scale-95 transition-transform shadow-lg"
+              >
+                <Star size={22} strokeWidth={2.5} fill="currentColor" />
+              </button>
+            )}
+            
+            <button
+              onClick={() => handleButtonSwipe("right")}
+              className="w-14 h-14 rounded-full bg-success/20 border-2 border-success text-success flex items-center justify-center active:scale-95 transition-transform shadow-lg"
+            >
+              <Heart size={26} strokeWidth={2.5} fill="currentColor" />
+            </button>
+          </div>
+        </div>
+
         <motion.div
-          className="relative w-full max-w-xl bg-card rounded-2xl card-shadow overflow-hidden cursor-grab active:cursor-grabbing"
+          className="relative w-full max-w-xl mx-auto bg-card rounded-2xl card-shadow overflow-hidden cursor-grab active:cursor-grabbing md:mt-0 mt-20 touch-pan-y"
           style={{ x, rotate, opacity }}
           drag={isActive ? "x" : false}
           dragConstraints={{ left: 0, right: 0 }}
-          dragElastic={0.7}
+          dragElastic={0.9}
           onDragEnd={handleDragEnd}
           whileTap={{ scale: 0.98 }}
         >
@@ -255,13 +295,16 @@ export function SwipeCard({ lead, onSwipe, onSuperLike, isActive }: SwipeCardPro
             YES!
           </motion.div>
 
-          {/* Content area - no scrolling needed now */}
-          <div onPointerDownCapture={(e) => e.stopPropagation()}>
-            {/* 3-Image Carousel */}
+          {/* Content area - scrollable on mobile */}
+          <div 
+            className="max-h-[calc(100vh-180px)] md:max-h-none overflow-y-auto overscroll-contain"
+            onPointerDownCapture={(e) => e.stopPropagation()}
+          >
+            {/* Image Carousel - more compact on mobile */}
             {mediaUrls.length > 0 ? (
-              <div className="relative bg-black/30 p-2">
-                {/* 3-image grid */}
-                <div className="grid grid-cols-3 gap-1.5">
+              <div className="relative bg-black/30 p-1.5 md:p-2">
+                {/* Image grid - 2 cols on mobile, 3 on desktop */}
+                <div className={`grid gap-1.5 ${isMobile ? 'grid-cols-2' : 'grid-cols-3'}`}>
                   {currentPageImages.map((url, i) => {
                     const globalIndex = carouselIndex * IMAGES_PER_PAGE + i;
                     return (
@@ -283,7 +326,7 @@ export function SwipeCard({ lead, onSwipe, onSuperLike, isActive }: SwipeCardPro
                       </button>
                     );
                   })}
-                  {/* Fill empty slots if less than 3 images on last page */}
+                  {/* Fill empty slots */}
                   {currentPageImages.length < IMAGES_PER_PAGE && 
                     Array(IMAGES_PER_PAGE - currentPageImages.length).fill(0).map((_, i) => (
                       <div key={`empty-${i}`} className="aspect-[3/4] rounded-lg bg-muted/20" />
@@ -314,7 +357,7 @@ export function SwipeCard({ lead, onSwipe, onSuperLike, isActive }: SwipeCardPro
                 )}
 
                 {/* Page indicator & count */}
-                <div className="flex items-center justify-center gap-2 mt-2">
+                <div className="flex items-center justify-center gap-2 mt-1.5">
                   {totalPages > 1 && (
                     <div className="flex items-center gap-1">
                       {Array(totalPages).fill(0).map((_, i) => (
@@ -336,46 +379,46 @@ export function SwipeCard({ lead, onSwipe, onSuperLike, isActive }: SwipeCardPro
                 </div>
               </div>
             ) : (
-              <div className="h-20 bg-gradient-to-br from-primary/20 via-accent/20 to-purple-500/20 flex items-center justify-center">
+              <div className="h-16 md:h-20 bg-gradient-to-br from-primary/20 via-accent/20 to-purple-500/20 flex items-center justify-center">
                 <span className="text-muted-foreground text-sm">No media available</span>
               </div>
             )}
 
-            {/* Stats Bar - Prominent */}
-            <div className="grid grid-cols-4 gap-1 p-3 bg-gradient-to-r from-primary/10 via-accent/10 to-purple-500/10 border-y border-border/50">
+            {/* Stats Bar - Compact on mobile */}
+            <div className="grid grid-cols-4 gap-1 p-2 md:p-3 bg-gradient-to-r from-primary/10 via-accent/10 to-purple-500/10 border-y border-border/50">
               <div className="flex flex-col items-center justify-center text-center">
-                <TrendingUp size={14} className="text-emerald-400 mb-1" />
-                <div className="text-sm font-bold text-foreground">{lead.karma.toLocaleString()}</div>
-                <div className="text-[9px] text-muted-foreground uppercase tracking-wide">Karma</div>
+                <TrendingUp size={12} className="text-emerald-400 mb-0.5 md:mb-1" />
+                <div className="text-xs md:text-sm font-bold text-foreground">{lead.karma.toLocaleString()}</div>
+                <div className="text-[8px] md:text-[9px] text-muted-foreground uppercase tracking-wide">Karma</div>
               </div>
               <div className="flex flex-col items-center justify-center text-center border-l border-border/30">
-                <FileText size={14} className="text-sky-400 mb-1" />
-                <div className="text-sm font-bold text-foreground">{stats.postsPerDay}</div>
-                <div className="text-[9px] text-muted-foreground uppercase tracking-wide">Posts/Day</div>
+                <FileText size={12} className="text-sky-400 mb-0.5 md:mb-1" />
+                <div className="text-xs md:text-sm font-bold text-foreground">{stats.postsPerDay}</div>
+                <div className="text-[8px] md:text-[9px] text-muted-foreground uppercase tracking-wide">Posts/Day</div>
               </div>
               <div className="flex flex-col items-center justify-center text-center border-l border-border/30">
-                <ThumbsUp size={14} className="text-rose-400 mb-1" />
-                <div className="text-sm font-bold text-foreground">{stats.avgUpvotes}</div>
-                <div className="text-[9px] text-muted-foreground uppercase tracking-wide">Avg Upvotes</div>
+                <ThumbsUp size={12} className="text-rose-400 mb-0.5 md:mb-1" />
+                <div className="text-xs md:text-sm font-bold text-foreground">{stats.avgUpvotes}</div>
+                <div className="text-[8px] md:text-[9px] text-muted-foreground uppercase tracking-wide">Avg Upvotes</div>
               </div>
               <div className="flex flex-col items-center justify-center text-center border-l border-border/30">
-                <Clock size={14} className="text-amber-400 mb-1" />
-                <div className="text-sm font-bold text-foreground">{stats.accountAge}</div>
-                <div className="text-[9px] text-muted-foreground uppercase tracking-wide">Age</div>
+                <Clock size={12} className="text-amber-400 mb-0.5 md:mb-1" />
+                <div className="text-xs md:text-sm font-bold text-foreground">{stats.accountAge}</div>
+                <div className="text-[8px] md:text-[9px] text-muted-foreground uppercase tracking-wide">Age</div>
               </div>
             </div>
 
-            {/* Indicator Badges Row */}
-            <div className="grid grid-cols-4 gap-2 p-3 bg-secondary/20">
-              <div className={`rounded-lg p-2 text-center ${
+            {/* Indicator Badges Row - More compact on mobile */}
+            <div className="grid grid-cols-4 gap-1.5 md:gap-2 p-2 md:p-3 bg-secondary/20">
+              <div className={`rounded-lg p-1.5 md:p-2 text-center ${
                 linkAnalysis.hasOF 
                   ? linkAnalysis.bioIndicatesOF 
                     ? 'bg-amber-500/20 border border-amber-500/40' 
                     : 'bg-sky-500/20 border border-sky-500/40' 
                   : 'bg-muted/30'
               }`}>
-                <div className="text-lg">🔥</div>
-                <div className={`text-[10px] font-medium ${
+                <div className="text-sm md:text-lg">🔥</div>
+                <div className={`text-[9px] md:text-[10px] font-medium ${
                   linkAnalysis.hasOF 
                     ? linkAnalysis.bioIndicatesOF ? 'text-amber-400' : 'text-sky-400' 
                     : 'text-muted-foreground'
@@ -384,52 +427,52 @@ export function SwipeCard({ lead, onSwipe, onSuperLike, isActive }: SwipeCardPro
                 </div>
               </div>
               
-              <div className={`rounded-lg p-2 text-center ${
+              <div className={`rounded-lg p-1.5 md:p-2 text-center ${
                 linkAnalysis.hasTracking 
                   ? 'bg-amber-500/20 border border-amber-500/40' 
                   : linkAnalysis.hasOF ? 'bg-emerald-500/20 border border-emerald-500/40' : 'bg-muted/30'
               }`}>
-                <div className="text-lg">{linkAnalysis.hasTracking ? '🏷️' : linkAnalysis.hasOF ? '✓' : '—'}</div>
-                <div className={`text-[10px] font-medium ${
+                <div className="text-sm md:text-lg">{linkAnalysis.hasTracking ? '🏷️' : linkAnalysis.hasOF ? '✓' : '—'}</div>
+                <div className={`text-[9px] md:text-[10px] font-medium ${
                   linkAnalysis.hasTracking ? 'text-amber-400' : linkAnalysis.hasOF ? 'text-emerald-400' : 'text-muted-foreground'
                 }`}>
                   {linkAnalysis.hasTracking ? 'Agency?' : linkAnalysis.hasOF ? 'No Track' : '—'}
                 </div>
               </div>
               
-              <div className={`rounded-lg p-2 text-center ${linkAnalysis.hasLinktree ? 'bg-emerald-500/20 border border-emerald-500/40' : 'bg-muted/30'}`}>
-                <div className="text-lg">🌳</div>
-                <div className={`text-[10px] font-medium ${linkAnalysis.hasLinktree ? 'text-emerald-400' : 'text-muted-foreground'}`}>
+              <div className={`rounded-lg p-1.5 md:p-2 text-center ${linkAnalysis.hasLinktree ? 'bg-emerald-500/20 border border-emerald-500/40' : 'bg-muted/30'}`}>
+                <div className="text-sm md:text-lg">🌳</div>
+                <div className={`text-[9px] md:text-[10px] font-medium ${linkAnalysis.hasLinktree ? 'text-emerald-400' : 'text-muted-foreground'}`}>
                   {linkAnalysis.hasLinktree ? 'Linktree' : 'No Link'}
                 </div>
               </div>
               
-              <div className={`rounded-lg p-2 text-center ${linkAnalysis.hasSocials ? 'bg-purple-500/20 border border-purple-500/40' : 'bg-muted/30'}`}>
-                <div className="text-lg">📱</div>
-                <div className={`text-[10px] font-medium ${linkAnalysis.hasSocials ? 'text-purple-400' : 'text-muted-foreground'}`}>
+              <div className={`rounded-lg p-1.5 md:p-2 text-center ${linkAnalysis.hasSocials ? 'bg-purple-500/20 border border-purple-500/40' : 'bg-muted/30'}`}>
+                <div className="text-sm md:text-lg">📱</div>
+                <div className={`text-[9px] md:text-[10px] font-medium ${linkAnalysis.hasSocials ? 'text-purple-400' : 'text-muted-foreground'}`}>
                   {linkAnalysis.hasSocials ? `${linkAnalysis.socialLinks.length} Social` : 'None'}
                 </div>
               </div>
             </div>
 
-            {/* User Info Section */}
-            <div className="p-4 space-y-3">
+            {/* User Info Section - Compact on mobile */}
+            <div className="p-3 md:p-4 space-y-2 md:space-y-3">
               {/* Header with avatar and username */}
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 md:gap-3">
                 {lead.avatar_url ? (
                   <img
                     src={lead.avatar_url}
                     alt={lead.reddit_username}
-                    className="w-12 h-12 rounded-full object-cover border-2 border-primary/30"
+                    className="w-10 h-10 md:w-12 md:h-12 rounded-full object-cover border-2 border-primary/30"
                   />
                 ) : (
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-xl font-bold text-white">
+                  <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-lg md:text-xl font-bold text-white">
                     {lead.reddit_username.charAt(0).toUpperCase()}
                   </div>
                 )}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <h2 className="text-lg font-bold text-foreground truncate">
+                    <h2 className="text-base md:text-lg font-bold text-foreground truncate">
                       u/{lead.reddit_username}
                     </h2>
                     <a
@@ -447,62 +490,66 @@ export function SwipeCard({ lead, onSwipe, onSuperLike, isActive }: SwipeCardPro
                 </div>
               </div>
 
-              {/* Found in subreddits */}
+              {/* Found in subreddits - compact on mobile */}
               {foundInSubreddits.length > 0 && (
-                <div className="flex flex-col gap-1.5">
-                  <div className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">
+                <div className="flex flex-col gap-1">
+                  <div className="text-[9px] md:text-[10px] text-muted-foreground uppercase tracking-wide font-medium">
                     Found in {foundInSubreddits.length} sub{foundInSubreddits.length > 1 ? 's' : ''}
                   </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {foundInSubreddits.map((subName) => (
+                  <div className="flex flex-wrap gap-1 md:gap-1.5">
+                    {foundInSubreddits.slice(0, isMobile ? 3 : 6).map((subName) => (
                       <a
                         key={subName}
                         href={`https://reddit.com/r/${subName}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="px-2 py-1 rounded-md bg-primary/10 text-primary text-xs font-medium hover:bg-primary/20 transition-colors border border-primary/20"
+                        className="px-1.5 md:px-2 py-0.5 md:py-1 rounded-md bg-primary/10 text-primary text-[10px] md:text-xs font-medium hover:bg-primary/20 transition-colors border border-primary/20"
                       >
                         r/{subName}
                       </a>
                     ))}
+                    {foundInSubreddits.length > (isMobile ? 3 : 6) && (
+                      <span className="px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                        +{foundInSubreddits.length - (isMobile ? 3 : 6)} more
+                      </span>
+                    )}
                   </div>
                 </div>
               )}
 
-              {/* Bio */}
+              {/* Bio - truncated on mobile */}
               {lead.bio && (
-                <p className="text-sm text-muted-foreground bg-secondary/30 rounded-lg p-3">
+                <p className="text-xs md:text-sm text-muted-foreground bg-secondary/30 rounded-lg p-2 md:p-3 line-clamp-2 md:line-clamp-none">
                   {lead.bio}
                 </p>
               )}
 
-              {/* Quick Action Links */}
-              <div className="flex flex-wrap gap-2">
+              {/* Quick Action Links - horizontal scroll on mobile */}
+              <div className="flex flex-nowrap md:flex-wrap gap-2 overflow-x-auto pb-1 -mx-3 px-3 md:mx-0 md:px-0">
                 {/* OnlyFans Button - or Check Bio for Links if no OF found */}
                 {linkAnalysis.ofLinks.length > 0 ? (
                   <a
                     href={linkAnalysis.ofLinks[0]}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium transition-colors shadow-lg text-sm ${
+                    className={`flex-shrink-0 flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-2 md:py-2.5 rounded-lg font-medium transition-colors shadow-lg text-xs md:text-sm ${
                       linkAnalysis.bioIndicatesOF 
                         ? 'bg-amber-500 text-white hover:bg-amber-600 shadow-amber-500/20' 
                         : 'bg-sky-500 text-white hover:bg-sky-600 shadow-sky-500/20'
                     }`}
                   >
-                    🔥 {linkAnalysis.bioIndicatesOF ? 'Check OnlyFans' : 'View OnlyFans'}
-                    <ExternalLink size={14} />
+                    🔥 {linkAnalysis.bioIndicatesOF ? 'Check OF' : 'View OF'}
+                    <ExternalLink size={12} />
                   </a>
                 ) : (
-                  // No OF link found - show button to check their bio/profile for links
                   <a
                     href={lead.profile_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-lg font-medium hover:from-pink-600 hover:to-rose-600 transition-colors shadow-lg shadow-pink-500/20 text-sm"
+                    className="flex-shrink-0 flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-2 md:py-2.5 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-lg font-medium hover:from-pink-600 hover:to-rose-600 transition-colors shadow-lg shadow-pink-500/20 text-xs md:text-sm"
                   >
-                    🔍 Check Bio for Links
-                    <ExternalLink size={14} />
+                    🔍 Check Bio
+                    <ExternalLink size={12} />
                   </a>
                 )}
 
@@ -512,32 +559,32 @@ export function SwipeCard({ lead, onSwipe, onSuperLike, isActive }: SwipeCardPro
                     href={linkAnalysis.linktreeLinks[0]}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-2 px-4 py-2 bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 rounded-lg font-medium hover:bg-emerald-500/30 transition-colors text-sm"
+                    className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 rounded-lg font-medium hover:bg-emerald-500/30 transition-colors text-xs md:text-sm"
                   >
-                    🌳 Linktree
-                    <ExternalLink size={12} />
+                    🌳 Links
+                    <ExternalLink size={11} />
                   </a>
                 )}
 
-                {/* Reddit Profile - only show if we have an OF link (otherwise the "Check Bio" button covers this) */}
+                {/* Reddit Profile - only show if we have an OF link */}
                 {linkAnalysis.ofLinks.length > 0 && (
                   <a
                     href={lead.profile_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-2 px-4 py-2 bg-orange-500/20 text-orange-400 border border-orange-500/40 rounded-lg font-medium hover:bg-orange-500/30 transition-colors text-sm"
+                    className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 bg-orange-500/20 text-orange-400 border border-orange-500/40 rounded-lg font-medium hover:bg-orange-500/30 transition-colors text-xs md:text-sm"
                   >
-                    Reddit Profile
-                    <ExternalLink size={12} />
+                    Reddit
+                    <ExternalLink size={11} />
                   </a>
                 )}
               </div>
             </div>
           </div>
 
-          {/* Action buttons */}
+          {/* Desktop Action buttons - hidden on mobile */}
           <div 
-            className="flex items-center justify-center gap-4 p-4 bg-card border-t border-border"
+            className="hidden md:flex items-center justify-center gap-4 p-4 bg-card border-t border-border"
             onPointerDownCapture={(e) => e.stopPropagation()}
           >
             <button
@@ -603,9 +650,9 @@ export function SwipeCard({ lead, onSwipe, onSuperLike, isActive }: SwipeCardPro
                   e.stopPropagation();
                   setLightboxImageIndex(lightboxImageIndex - 1);
                 }}
-                className="absolute left-4 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white/20 hover:bg-white/30 transition-colors"
+                className="absolute left-2 md:left-4 top-1/2 -translate-y-1/2 p-2 md:p-3 rounded-full bg-white/20 hover:bg-white/30 transition-colors"
               >
-                <ChevronLeft size={32} className="text-white" />
+                <ChevronLeft size={28} className="text-white" />
               </button>
             )}
             {lightboxImageIndex < mediaUrls.length - 1 && (
@@ -614,9 +661,9 @@ export function SwipeCard({ lead, onSwipe, onSuperLike, isActive }: SwipeCardPro
                   e.stopPropagation();
                   setLightboxImageIndex(lightboxImageIndex + 1);
                 }}
-                className="absolute right-4 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white/20 hover:bg-white/30 transition-colors"
+                className="absolute right-2 md:right-4 top-1/2 -translate-y-1/2 p-2 md:p-3 rounded-full bg-white/20 hover:bg-white/30 transition-colors"
               >
-                <ChevronRight size={32} className="text-white" />
+                <ChevronRight size={28} className="text-white" />
               </button>
             )}
 
@@ -632,8 +679,8 @@ export function SwipeCard({ lead, onSwipe, onSuperLike, isActive }: SwipeCardPro
               onClick={(e) => e.stopPropagation()}
             />
 
-            {/* Keyboard hint */}
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white/60 text-xs flex items-center gap-4">
+            {/* Keyboard hint - hidden on mobile */}
+            <div className="hidden md:flex absolute bottom-4 left-1/2 -translate-x-1/2 text-white/60 text-xs items-center gap-4">
               <span>← → Navigate</span>
               <span>ESC Close</span>
             </div>
