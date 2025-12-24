@@ -72,30 +72,47 @@ else:
 # =============================================================================
 # PROXY CONFIGURATION (set via environment variables)
 # =============================================================================
-# Single rotating proxy with IP rotation API
-# Set these in your .env file or Railway/Vercel environment variables:
-#   PROXY_HOST, PROXY_PORT, PROXY_USER, PROXY_PASS, PROXY_ROTATION_URL
+# Brightdata Residential Rotating Proxy (RECOMMENDED - new IP per request)
+# Format: http://user-zone-residential:password@brd.superproxy.io:22225
+# Set BRIGHTDATA_PROXY in your .env file or Railway environment variables
 # =============================================================================
+BRIGHTDATA_PROXY = os.getenv("BRIGHTDATA_PROXY", "")
+
+# Legacy: Single rotating proxy with manual IP rotation API
 PROXY_HOST = os.getenv("PROXY_HOST", "")
 PROXY_PORT = os.getenv("PROXY_PORT", "")
 PROXY_USER = os.getenv("PROXY_USER", "")
 PROXY_PASS = os.getenv("PROXY_PASS", "")
 
-# Construct proxy URL
-if PROXY_HOST and PROXY_PORT and PROXY_USER and PROXY_PASS:
+# Construct proxy URL - prefer Brightdata, fallback to legacy
+if BRIGHTDATA_PROXY:
+    PROXY_URL = BRIGHTDATA_PROXY
+elif PROXY_HOST and PROXY_PORT and PROXY_USER and PROXY_PASS:
     PROXY_URL = f"http://{PROXY_USER}:{PROXY_PASS}@{PROXY_HOST}:{PROXY_PORT}"
 else:
     PROXY_URL = os.getenv("PROXY_URL", "")
 
-# Rotation API URL - called when rate limited to get a new IP
+# Rotation API URL - only needed for legacy proxies (Brightdata auto-rotates)
 PROXY_ROTATION_URL = os.getenv("PROXY_ROTATION_URL", "")
 
-# Rate limit wait time after rotating IP (seconds)
-RATE_LIMIT_WAIT_SECONDS = int(os.getenv("RATE_LIMIT_WAIT_SECONDS", "10"))
+# Rate limit wait time after rotating IP (seconds) - reduced for Brightdata
+RATE_LIMIT_WAIT_SECONDS = int(os.getenv("RATE_LIMIT_WAIT_SECONDS", "2"))
 
 # Legacy: comma-separated proxy list (for multiple static proxies)
 _proxy_str = os.getenv("PROXIES", "")
 PROXIES = [p.strip() for p in _proxy_str.split(",") if p.strip()] if _proxy_str else []
+
+# =============================================================================
+# CONCURRENCY SETTINGS (for parallel processing)
+# =============================================================================
+# Number of subreddits to process concurrently
+CONCURRENT_SUBREDDITS = int(os.getenv("CONCURRENT_SUBREDDITS", "20"))
+
+# Number of users to process concurrently per subreddit
+CONCURRENT_USERS = int(os.getenv("CONCURRENT_USERS", "10"))
+
+# Max concurrent HTTP requests (semaphore limit)
+MAX_CONCURRENT_REQUESTS = int(os.getenv("MAX_CONCURRENT_REQUESTS", "50"))
 
 # Crawler settings
 CRAWLER_MIN_SUBSCRIBERS = int(os.getenv("CRAWLER_MIN_SUBSCRIBERS", "1000"))  # Skip tiny subs

@@ -1,6 +1,9 @@
 """
 Async Reddit client using public JSON API endpoints.
-Supports rotating proxy with automatic IP rotation on rate limits.
+Optimized for Brightdata residential rotating proxies - new IP per request.
+
+For parallel processing, create multiple client instances or use the
+provided helper functions for batch operations.
 """
 import asyncio
 import re
@@ -12,17 +15,21 @@ import httpx
 from config import (
     REDDIT_BASE_URL,
     REDDIT_USER_AGENT,
-    SCRAPE_DELAY_SECONDS,
     LINK_PATTERNS,
     PROXY_URL,
-    PROXY_ROTATION_URL,
+    BRIGHTDATA_PROXY,
     RATE_LIMIT_WAIT_SECONDS,
-    PROXIES,
+    MAX_CONCURRENT_REQUESTS,
 )
 
 
 class RedditClient:
-    """Async client for Reddit's public JSON API with rotating proxy support."""
+    """
+    Async client for Reddit's public JSON API.
+    
+    Optimized for Brightdata residential rotating proxies which provide
+    a new IP per request, eliminating the need for manual rotation.
+    """
 
     def __init__(self, proxy: str = None, worker_id: int = None):
         """
@@ -35,47 +42,40 @@ class RedditClient:
         self.base_url = REDDIT_BASE_URL
         self.headers = {
             "User-Agent": REDDIT_USER_AGENT,
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+            "Accept": "application/json",
             "Accept-Language": "en-US,en;q=0.5",
             "Accept-Encoding": "gzip, deflate, br",
             "DNT": "1",
             "Connection": "keep-alive",
-            "Upgrade-Insecure-Requests": "1",
-            "Sec-Fetch-Dest": "document",
-            "Sec-Fetch-Mode": "navigate",
-            "Sec-Fetch-Site": "none",
-            "Cache-Control": "max-age=0",
         }
         self.client: Optional[httpx.AsyncClient] = None
-        self.last_request_time = 0
         self.link_patterns = [re.compile(p, re.IGNORECASE) for p in LINK_PATTERNS]
         
-        # Proxy support - use configured proxy URL by default
-        self.proxy = proxy or PROXY_URL
+        # Proxy support - prefer Brightdata, fallback to legacy
+        self.proxy = proxy or BRIGHTDATA_PROXY or PROXY_URL
         self.worker_id = worker_id or random.randint(1000, 9999)
+        self.is_brightdata = bool(BRIGHTDATA_PROXY) or (self.proxy and 'brd.superproxy.io' in self.proxy)
         
-        # Fallback to legacy proxy list if no single proxy configured
-        if not self.proxy and PROXIES:
-            self.proxy = random.choice(PROXIES)
-        
-        # Track rate limit rotations
-        self.rotation_count = 0
-        
-        # Track consecutive 403s/empty responses (indicates IP block)
-        self.consecutive_403s = 0
-        self.max_403s_before_rotation = 1  # Rotate after just 1 empty response (aggressive)
-        self.last_rotation_time = 0  # Track when we last rotated
+        # Stats tracking
+        self.requests_made = 0
+        self.requests_failed = 0
+        self.consecutive_failures = 0
 
     async def __aenter__(self):
-        # Configure proxy if available
+        """Initialize HTTP client with proxy."""
         transport = None
         if self.proxy:
             # Mask password in log
-            proxy_log = self.proxy.split('@')[0][:20] + '...@' + self.proxy.split('@')[1] if '@' in self.proxy else self.proxy[:40]
-            print(f"[Worker {self.worker_id}] ✓ Using rotating proxy: {proxy_log}")
+            if '@' in self.proxy:
+                proxy_log = self.proxy.split('@')[0][:20] + '...@' + self.proxy.split('@')[1]
+            else:
+                proxy_log = self.proxy[:40]
+            
+            proxy_type = "Brightdata (auto-rotating)" if self.is_brightdata else "rotating"
+            print(f"[Worker {self.worker_id}] ✓ Using {proxy_type} proxy: {proxy_log}")
             transport = httpx.AsyncHTTPTransport(proxy=self.proxy)
         else:
-            print(f"[Worker {self.worker_id}] ⚠️ WARNING: No proxy configured - Reddit will likely block requests!")
+            print(f"[Worker {self.worker_id}] ⚠️ WARNING: No proxy configured!")
         
         self.client = httpx.AsyncClient(
             headers=self.headers,
@@ -84,210 +84,62 @@ class RedditClient:
             transport=transport,
         )
         
-        # Pre-flight check: Try to get a fresh IP if using rotation
-        if self.proxy and PROXY_ROTATION_URL:
-            print(f"[Worker {self.worker_id}] 🔍 Pre-flight: Checking if proxy IP needs rotation...")
-            # Do a quick test to see if IP is blocked
-            test_worked = await self._test_proxy_health()
-            if not test_worked:
-                print(f"[Worker {self.worker_id}] 🚨 Proxy IP appears blocked. Forcing rotation...")
-                await self._rotate_ip()
-        
         return self
-    
-    async def _test_proxy_health(self) -> bool:
-        """Quick test to see if proxy IP is working with Reddit posts endpoint."""
-        try:
-            # Test the POSTS endpoint (not just about), which is what gets blocked
-            test_url = f"{self.base_url}/r/test/new.json?limit=1"
-            response = await self.client.get(test_url, timeout=10.0)
-            if response.status_code == 200:
-                data = response.json()
-                # Check if we actually got posts back (not empty)
-                children = data.get("data", {}).get("children", [])
-                # Proxy is healthy if we got any posts back
-                is_healthy = len(children) > 0
-                if not is_healthy:
-                    print(f"[Worker {self.worker_id}] ⚠️  Health check: Empty response (IP likely blocked)")
-                return is_healthy
-            return False
-        except Exception as e:
-            print(f"[Worker {self.worker_id}] ⚠️  Health check failed: {e}")
-            return False
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         if self.client:
             await self.client.aclose()
 
-    async def _rate_limit(self):
-        """Enforce rate limiting between requests."""
-        now = asyncio.get_event_loop().time()
-        elapsed = now - self.last_request_time
-        if elapsed < SCRAPE_DELAY_SECONDS:
-            await asyncio.sleep(SCRAPE_DELAY_SECONDS - elapsed)
-        self.last_request_time = asyncio.get_event_loop().time()
-
-    async def _rotate_ip(self):
+    async def _get_json(self, url: str, max_retries: int = 3) -> Optional[dict]:
         """
-        Call the proxy rotation API to get a new IP address.
-        If no rotation API is configured, recreate the HTTP client to force new connection.
-        Handles ProxyEmpire's 3-minute cooldown automatically.
+        Make a GET request and return JSON.
+        
+        With Brightdata, each request gets a new IP, so retries are effective
+        without needing explicit rotation.
         """
-        if PROXY_ROTATION_URL:
-            max_retries = 10
-            retry_count = 0
-            
-            while retry_count < max_retries:
-                try:
-                    # Use a separate client without proxy to call the rotation API
-                    async with httpx.AsyncClient(timeout=30.0) as rotation_client:
-                        if retry_count == 0:
-                            print(f"[Worker {self.worker_id}] 🔄 Rotating proxy IP via API...")
-                        
-                        response = await rotation_client.get(PROXY_ROTATION_URL)
-                        if response.status_code == 200:
-                            data = response.json()
-                            
-                            # Check for success
-                            if data.get("status") == 200 or "error" not in data:
-                                self.rotation_count += 1
-                                self.last_rotation_time = asyncio.get_event_loop().time()
-                                print(f"[Worker {self.worker_id}] ✓ IP rotated successfully (rotation #{self.rotation_count})")
-                                # Wait a bit for new IP to take effect
-                                await asyncio.sleep(5)
-                                return True
-                            
-                            # Handle cooldown (ProxyEmpire: "You may try again in X seconds")
-                            elif "error" in data and "seconds" in str(data["error"]):
-                                error_msg = data["error"]
-                                # Extract wait time from error message
-                                import re
-                                match = re.search(r'(\d+)\s*seconds', error_msg)
-                                if match:
-                                    wait_time = int(match.group(1))
-                                    print(f"[Worker {self.worker_id}] ⏳ Rotation cooldown: {wait_time}s remaining. Waiting...")
-                                    await asyncio.sleep(min(wait_time + 5, 180))  # Cap at 3 minutes
-                                    retry_count += 1
-                                    continue
-                                else:
-                                    print(f"[Worker {self.worker_id}] ⚠️ Cooldown active: {error_msg}")
-                                    await asyncio.sleep(30)
-                                    retry_count += 1
-                                    continue
-                            
-                            # Handle other errors
-                            elif data.get("status") == 429:
-                                print(f"[Worker {self.worker_id}] ⏳ Rate limited. Waiting 30s...")
-                                await asyncio.sleep(30)
-                                retry_count += 1
-                                continue
-                            
-                            else:
-                                print(f"[Worker {self.worker_id}] ✗ Unexpected response: {data}")
-                                break
-                        else:
-                            print(f"[Worker {self.worker_id}] ✗ IP rotation failed: HTTP {response.status_code}")
-                            break
-                            
-                except Exception as e:
-                    print(f"[Worker {self.worker_id}] ✗ IP rotation error: {e}")
-                    break
-            
-            if retry_count >= max_retries:
-                print(f"[Worker {self.worker_id}] ⚠️ Max rotation retries reached")
-        
-        # No rotation URL OR rotation failed - recreate client to force new connection
-        # Many rotating proxies give a new IP on each new connection
-        print(f"[Worker {self.worker_id}] Recreating HTTP client to force new connection...")
-        try:
-            if self.client:
-                await self.client.aclose()
-            
-            transport = None
-            if self.proxy:
-                transport = httpx.AsyncHTTPTransport(proxy=self.proxy)
-            
-            self.client = httpx.AsyncClient(
-                headers=self.headers,
-                timeout=30.0,
-                follow_redirects=True,
-                transport=transport,
-            )
-            self.rotation_count += 1
-            print(f"[Worker {self.worker_id}] ✓ Client recreated (rotation #{self.rotation_count})")
-            return True
-        except Exception as e:
-            print(f"[Worker {self.worker_id}] ✗ Client recreation failed: {e}")
-            return False
-
-    async def _get_json(self, url: str, _retry_count: int = 0, _max_retries: int = 3) -> Optional[dict]:
-        """Make a rate-limited GET request and return JSON."""
-        # Check if we've exceeded max retries
-        if _retry_count >= _max_retries:
-            print(f"[Worker {self.worker_id}] ❌ Max retries ({_max_retries}) exceeded for {url}")
-            return None
-        
-        await self._rate_limit()
-        try:
-            response = await self.client.get(url)
-            
-            # Handle 429 rate limit
-            if response.status_code == 429:
-                print(f"[Worker {self.worker_id}] Rate limited (429). Rotating IP and waiting {RATE_LIMIT_WAIT_SECONDS}s... (retry {_retry_count + 1}/{_max_retries})")
-                self.consecutive_403s = 0  # Reset 403 counter
-                await self._rotate_ip()
-                await asyncio.sleep(RATE_LIMIT_WAIT_SECONDS)
-                return await self._get_json(url, _retry_count=_retry_count + 1, _max_retries=_max_retries)
-            
-            # Handle 403 forbidden - Reddit IP block
-            if response.status_code == 403:
-                self.consecutive_403s += 1
-                print(f"[Worker {self.worker_id}] 403 Forbidden (count: {self.consecutive_403s}/{self.max_403s_before_rotation})")
-                
-                if self.consecutive_403s >= self.max_403s_before_rotation:
-                    print(f"[Worker {self.worker_id}] 🚨 IP appears blocked! Rotating IP and waiting 60s... (retry {_retry_count + 1}/{_max_retries})")
-                    await self._rotate_ip()
-                    self.consecutive_403s = 0  # Reset counter after rotation
-                    await asyncio.sleep(60)  # Wait longer after 403 block
-                    return await self._get_json(url, _retry_count=_retry_count + 1, _max_retries=_max_retries)  # Retry this request
-                
-                return None  # Return None for first 403, let crawler try next sub
-            
-            # Success - reset 403 counter
-            self.consecutive_403s = 0
-            response.raise_for_status()
-            
-            # Parse JSON
+        for attempt in range(max_retries):
             try:
-                json_data = response.json()
-                return json_data
+                response = await self.client.get(url)
+                self.requests_made += 1
+                
+                # Handle rate limit - wait briefly and retry (new IP on retry)
+                if response.status_code == 429:
+                    wait_time = RATE_LIMIT_WAIT_SECONDS * (attempt + 1)
+                    print(f"[Worker {self.worker_id}] Rate limited (429). Waiting {wait_time}s... (attempt {attempt + 1}/{max_retries})")
+                    await asyncio.sleep(wait_time)
+                    continue
+                
+                # Handle 403 forbidden - retry with new IP
+                if response.status_code == 403:
+                    self.consecutive_failures += 1
+                    if attempt < max_retries - 1:
+                        print(f"[Worker {self.worker_id}] 403 Forbidden. Retrying... (attempt {attempt + 1}/{max_retries})")
+                        await asyncio.sleep(1)
+                        continue
+                    return None
+                
+                # Success
+                self.consecutive_failures = 0
+                response.raise_for_status()
+                
+                return response.json()
+                
+            except httpx.HTTPStatusError as e:
+                self.requests_failed += 1
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(1)
+                    continue
+                print(f"[Worker {self.worker_id}] HTTP error for {url}: {e}")
+                return None
             except Exception as e:
-                print(f"[Worker {self.worker_id}] ✗ JSON parse error: {e}")
-                print(f"[Worker {self.worker_id}] Response text: {response.text[:500]}")
+                self.requests_failed += 1
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(1)
+                    continue
+                print(f"[Worker {self.worker_id}] Error fetching {url}: {e}")
                 return None
-            
-        except httpx.HTTPStatusError as e:
-            if e.response.status_code == 429:
-                print(f"[Worker {self.worker_id}] Rate limited (429 exception). Rotating IP and waiting {RATE_LIMIT_WAIT_SECONDS}s... (retry {_retry_count + 1}/{_max_retries})")
-                self.consecutive_403s = 0
-                await self._rotate_ip()
-                await asyncio.sleep(RATE_LIMIT_WAIT_SECONDS)
-                return await self._get_json(url, _retry_count=_retry_count + 1, _max_retries=_max_retries)
-            if e.response.status_code == 403:
-                self.consecutive_403s += 1
-                print(f"[Worker {self.worker_id}] 403 Forbidden exception (count: {self.consecutive_403s})")
-                if self.consecutive_403s >= self.max_403s_before_rotation:
-                    print(f"[Worker {self.worker_id}] 🚨 IP appears blocked! Rotating IP... (retry {_retry_count + 1}/{_max_retries})")
-                    await self._rotate_ip()
-                    self.consecutive_403s = 0
-                    await asyncio.sleep(60)
-                    return await self._get_json(url, _retry_count=_retry_count + 1, _max_retries=_max_retries)
-                return None
-            print(f"[Worker {self.worker_id}] HTTP error for {url}: {e}")
-            return None
-        except Exception as e:
-            print(f"[Worker {self.worker_id}] Error fetching {url}: {e}")
-            return None
+        
+        return None
 
     async def search_subreddits(self, query: str = "onlyfans", nsfw: bool = True, limit: int = 50) -> list[dict]:
         """Search for subreddits matching query."""
@@ -343,26 +195,8 @@ class RedditClient:
             
             data = await self._get_json(url)
             
-            # Detect "empty response" blocks (Reddit returns 200 with no data when IP blocked)
             if not data or "data" not in data:
-                self.consecutive_403s += 1
-                print(f"[Worker {self.worker_id}] Empty response for r/{subreddit} (block count: {self.consecutive_403s}/{self.max_403s_before_rotation})")
-                print(f"[Worker {self.worker_id}] DEBUG: data={data}")
-                
-                if self.consecutive_403s >= self.max_403s_before_rotation:
-                    print(f"[Worker {self.worker_id}] 🚨 Multiple empty responses - IP likely blocked! Rotating...")
-                    await self._rotate_ip()
-                    self.consecutive_403s = 0
-                    await asyncio.sleep(60)
-                    # Retry this subreddit after rotation
-                    data = await self._get_json(url)
-                    if not data or "data" not in data:
-                        break  # Still failing after rotation, give up on this sub
-                else:
-                    break  # First empty response, just skip this sub
-            
-            # Success - reset block counter
-            self.consecutive_403s = 0
+                break
             
             children = data["data"].get("children", [])
             if not children:
@@ -576,4 +410,79 @@ class RedditClient:
         
         return media_urls
 
+    def get_stats(self) -> dict:
+        """Get client statistics."""
+        return {
+            "requests_made": self.requests_made,
+            "requests_failed": self.requests_failed,
+            "consecutive_failures": self.consecutive_failures,
+        }
 
+
+# =============================================================================
+# Helper functions for parallel batch operations
+# =============================================================================
+
+async def fetch_subreddit_batch(
+    subreddits: list[str],
+    proxy: str = None,
+    max_concurrent: int = None,
+) -> dict[str, list[dict]]:
+    """
+    Fetch posts from multiple subreddits in parallel.
+    
+    Args:
+        subreddits: List of subreddit names to fetch
+        proxy: Proxy URL (uses config default if not provided)
+        max_concurrent: Max concurrent requests (uses config default if not provided)
+    
+    Returns:
+        Dict mapping subreddit name to list of posts
+    """
+    max_concurrent = max_concurrent or MAX_CONCURRENT_REQUESTS
+    semaphore = asyncio.Semaphore(max_concurrent)
+    results = {}
+    
+    async def fetch_one(sub_name: str):
+        async with semaphore:
+            async with RedditClient(proxy=proxy) as client:
+                posts = await client.get_subreddit_posts(sub_name)
+                results[sub_name] = posts
+    
+    await asyncio.gather(*[fetch_one(sub) for sub in subreddits])
+    return results
+
+
+async def fetch_user_batch(
+    usernames: list[str],
+    proxy: str = None,
+    max_concurrent: int = None,
+) -> dict[str, dict]:
+    """
+    Fetch profiles for multiple users in parallel.
+    
+    Args:
+        usernames: List of Reddit usernames to fetch
+        proxy: Proxy URL (uses config default if not provided)
+        max_concurrent: Max concurrent requests (uses config default if not provided)
+    
+    Returns:
+        Dict mapping username to profile data (or None if failed)
+    """
+    max_concurrent = max_concurrent or MAX_CONCURRENT_REQUESTS
+    semaphore = asyncio.Semaphore(max_concurrent)
+    results = {}
+    
+    async def fetch_one(username: str):
+        async with semaphore:
+            async with RedditClient(proxy=proxy) as client:
+                profile = await client.get_user_profile(username)
+                posts, discovered_subs = await client.get_user_posts(username)
+                results[username] = {
+                    "profile": profile,
+                    "posts": posts,
+                    "discovered_subs": discovered_subs,
+                }
+    
+    await asyncio.gather(*[fetch_one(u) for u in usernames])
+    return results

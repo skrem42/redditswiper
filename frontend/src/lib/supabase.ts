@@ -755,6 +755,10 @@ export interface SubredditIntel {
   niche_categories: string[] | null;
   llm_analysis_confidence: "high" | "medium" | "low" | null;
   llm_analysis_reasoning: string | null;
+  // Content rating (hardcore/softcore classifier)
+  content_rating: "hardcore" | "softcore" | "uncertain" | null;
+  content_rating_confidence: "high" | "medium" | "low" | null;
+  content_rating_reasoning: string | null;
 }
 
 export interface SubredditIntelFilters {
@@ -765,8 +769,31 @@ export interface SubredditIntelFilters {
   search?: string;
   verificationRequired?: boolean;
   sellersAllowed?: "allowed" | "not_allowed";
+  contentRating?: "hardcore" | "softcore";
   sortBy?: "subscribers" | "weekly_visitors" | "weekly_contributions" | "competition_score";
   sortDesc?: boolean;
+}
+
+export async function updateSubredditIntelField(
+  subredditId: string,
+  field: "verification_required" | "sellers_allowed" | "content_rating",
+  value: boolean | string | null
+): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from("nsfw_subreddit_intel")
+      .update({ [field]: value })
+      .eq("id", subredditId);
+
+    if (error) {
+      console.error(`Error updating ${field}:`, error);
+      return false;
+    }
+    return true;
+  } catch (error) {
+    console.error(`Error updating ${field}:`, error);
+    return false;
+  }
 }
 
 export async function getSubredditIntel(
@@ -800,6 +827,9 @@ export async function getSubredditIntel(
   }
   if (filters.sellersAllowed) {
     query = query.eq("sellers_allowed", filters.sellersAllowed);
+  }
+  if (filters.contentRating) {
+    query = query.eq("content_rating", filters.contentRating);
   }
 
   // Apply sorting

@@ -1,9 +1,33 @@
-[00:00:01.041] Server  LOG     ✓ Ready in 737ms
-[00:00:08.155] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[03:28:47.671] Server  LOG     ✓ Compiled in 1314ms
-[03:31:19.485] Server  LOG     ✓ Compiled in 31ms
-[03:31:19.646] Browser WARN    GoTrueClient@sb-jmchmbwhnmlednaycxqh-auth-token:1 (2.89.0) 2025-12-22T21:14:25.259Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key.
-[03:31:32.451] Server  LOG     ✓ Compiled in 17ms
-[03:31:32.570] Browser WARN    GoTrueClient@sb-jmchmbwhnmlednaycxqh-auth-token:2 (2.89.0) 2025-12-22T21:14:38.217Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key.
-[03:31:40.731] Server  LOG     ✓ Compiled in 94ms
-[03:31:40.934] Browser WARN    GoTrueClient@sb-jmchmbwhnmlednaycxqh-auth-token:3 (2.89.0) 2025-12-22T21:14:46.505Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key.
+[00:00:02.121] Server  LOG     ✓ Ready in 1759ms
+[00:00:08.305] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:09:42.115] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:10:12.191] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[09:48:20.274] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[09:51:20.232] Server  LOG     ✓ Compiled in 25.1s
+[09:51:22.189] Server  LOG     ✓ Compiled in 452ms
+[09:51:24.633] Server  LOG     ✓ Compiled in 78ms
+[09:51:26.720] Server  LOG     ✓ Compiled in 51ms
+[09:51:28.590] Server  LOG     ✓ Compiled in 30ms
+[09:51:28.682] Browser ERROR   The final argument passed to %s changed size between renders. The order and size of this array must remain constant.
+
+Previous: %s
+Incoming: %s useEffect [weekly_visitors, true, , , all, all, ] [weekly_visitors, true, , , all, all, all, ]
+[09:51:35.603] Server  LOG     ✓ Compiled in 46ms
+[09:51:42.903] Server  LOG     ✓ Compiled in 2.6s
+[09:51:43.935] Server  LOG     ✓ Compiled in 315ms
+[09:52:03.665] Server  LOG     ✓ Compiled in 17ms
+[09:52:03.937] Browser WARN    GoTrueClient@sb-jmchmbwhnmlednaycxqh-auth-token:1 (2.89.0) 2025-12-23T19:20:08.563Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key.
+[09:52:47.320] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[22:36:13.089] Server  LOG     ✓ Compiled in 109ms
+[22:36:13.233] Browser WARN    GoTrueClient@sb-jmchmbwhnmlednaycxqh-auth-token:1 (2.89.0) 2025-12-24T08:04:17.772Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key.
+[22:36:15.180] Server  LOG     ✓ Compiled in 164ms
+[22:36:17.313] Server  LOG     ✓ Compiled in 87ms
+[22:36:22.307] Server  LOG     ✓ Compiled in 64ms
+[22:36:25.521] Browser ERROR   unhandledRejection: TypeError: onUpdate is not a function
+[22:36:26.379] Server  LOG     ✓ Compiled in 43ms
+[22:36:30.559] Server  LOG     ✓ Compiled in 41ms
+[22:36:31.992] Browser ERROR   unhandledRejection: TypeError: onUpdate is not a function
+[22:36:32.993] Server  LOG     ✓ Compiled in 32ms
+[22:36:34.773] Server  LOG     ✓ Compiled in 40ms
+[22:36:36.610] Server  LOG     ✓ Compiled in 34ms
+[22:41:23.277] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold

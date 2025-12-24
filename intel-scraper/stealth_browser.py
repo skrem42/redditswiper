@@ -716,3 +716,252 @@ class StealthBrowser:
         logger.error(f"[Worker {self.worker_id}] All retries exhausted for {url}")
         return False
 
+
+class BrowserPool:
+    """
+    Pool of browser contexts for parallel subreddit scraping.
+    
+    Each browser context has its own Reddit account from the AccountManager,
+    allowing safe parallel scraping without session conflicts.
+    """
+    
+    def __init__(
+        self,
+        size: int = 5,
+        proxy_url: str = None,
+        headless: bool = True,
+        worker_id: int = None,
+    ):
+        """
+        Initialize browser pool.
+        
+        Args:
+            size: Number of browser contexts to create
+            proxy_url: Proxy URL (uses config default if not provided)
+            headless: Run browsers in headless mode
+            worker_id: Base worker ID for logging
+        """
+        from account_manager import AccountManager, get_account_manager
+        
+        self.size = size
+        self.proxy_url = proxy_url or PROXY_URL
+        self.headless = headless
+        self.base_worker_id = worker_id or 1
+        
+        self.account_manager = get_account_manager()
+        
+        # Adjust pool size to available accounts
+        if self.size > self.account_manager.total_accounts:
+            logger.warning(
+                f"BrowserPool: Requested {self.size} contexts but only "
+                f"{self.account_manager.total_accounts} accounts available. "
+                f"Reducing pool size."
+            )
+            self.size = self.account_manager.total_accounts
+        
+        self.playwright = None
+        self.browser: Optional[Browser] = None
+        self.contexts: list[dict] = []  # {"context": BrowserContext, "page": Page, "account": RedditAccount}
+        self._lock = asyncio.Lock()
+        self._available = asyncio.Condition()
+        
+        self.stats = {
+            "contexts_created": 0,
+            "total_requests": 0,
+            "failed_requests": 0,
+        }
+    
+    async def start(self):
+        """Initialize the browser and create contexts."""
+        from playwright.async_api import async_playwright
+        
+        self.playwright = await async_playwright().start()
+        
+        # Browser launch args
+        launch_args = [
+            "--disable-blink-features=AutomationControlled",
+            "--disable-infobars",
+            "--no-sandbox",
+            "--disable-dev-shm-usage",
+            "--disable-gpu",
+            "--disable-software-rasterizer",
+        ]
+        
+        self.browser = await self.playwright.chromium.launch(
+            headless=self.headless,
+            args=launch_args,
+        )
+        
+        # Create browser contexts with accounts
+        for i in range(self.size):
+            account = await self.account_manager.acquire()
+            if not account:
+                logger.error(f"BrowserPool: Could not acquire account for context {i}")
+                break
+            
+            context = await self._create_context(account, worker_id=self.base_worker_id + i)
+            self.contexts.append({
+                "context": context["context"],
+                "page": context["page"],
+                "account": account,
+                "in_use": False,
+                "worker_id": self.base_worker_id + i,
+            })
+            self.stats["contexts_created"] += 1
+        
+        logger.info(f"BrowserPool: Created {len(self.contexts)} browser contexts")
+    
+    async def _create_context(self, account, worker_id: int) -> dict:
+        """Create a browser context with the given account."""
+        # Use fixed fingerprint for consistency
+        fp = StealthBrowser.FIXED_FINGERPRINT.copy()
+        
+        context_options = {
+            "viewport": fp["viewport"],
+            "user_agent": fp["user_agent"],
+            "locale": fp["language"],
+            "timezone_id": fp["timezone"],
+            "permissions": ["geolocation"],
+            "color_scheme": "dark",
+            "device_scale_factor": 1,
+            "is_mobile": False,
+            "has_touch": False,
+            "java_script_enabled": True,
+            "accept_downloads": False,
+            "ignore_https_errors": True,
+        }
+        
+        # Add proxy if configured
+        if self.proxy_url:
+            import re
+            match = re.match(r'https?://([^:]+):([^@]+)@([^:]+):(\d+)', self.proxy_url)
+            if match:
+                context_options["proxy"] = {
+                    "server": f"http://{match.group(3)}:{match.group(4)}",
+                    "username": match.group(1),
+                    "password": match.group(2),
+                }
+                logger.info(f"[Worker {worker_id}] Context using proxy: {match.group(3)}:{match.group(4)}")
+        
+        context = await self.browser.new_context(**context_options)
+        page = await context.new_page()
+        
+        # Apply stealth patches
+        await self._apply_stealth_patches(page)
+        
+        # Set account cookies
+        await context.add_cookies(account.get_cookies())
+        logger.info(f"[Worker {worker_id}] Set cookies for account: {account.username}")
+        
+        return {"context": context, "page": page}
+    
+    async def _apply_stealth_patches(self, page):
+        """Apply stealth patches to a page."""
+        stealth_script = """
+        Object.defineProperty(navigator, 'webdriver', { get: () => false });
+        
+        const originalQuery = window.navigator.permissions.query;
+        window.navigator.permissions.query = (parameters) => (
+            parameters.name === 'notifications' ?
+                Promise.resolve({ state: Notification.permission }) :
+                originalQuery(parameters)
+        );
+        
+        if (!window.chrome) {
+            window.chrome = { runtime: {}, loadTimes: function() {}, csi: function() {}, app: {} };
+        }
+        
+        Object.defineProperty(navigator, 'plugins', {
+            get: () => [
+                { 0: {type: "application/x-google-chrome-pdf"}, description: "PDF", filename: "internal-pdf-viewer", length: 1, name: "Chrome PDF Plugin" }
+            ],
+        });
+        
+        Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'] });
+        """
+        await page.add_init_script(stealth_script)
+    
+    async def acquire(self, timeout: float = 30.0) -> Optional[dict]:
+        """
+        Acquire an available browser context from the pool.
+        
+        Args:
+            timeout: Maximum seconds to wait for a context
+            
+        Returns:
+            Dict with context, page, account, and worker_id if acquired, None if timeout
+        """
+        async with self._lock:
+            for ctx in self.contexts:
+                if not ctx["in_use"]:
+                    ctx["in_use"] = True
+                    logger.debug(f"BrowserPool: Acquired context {ctx['worker_id']}")
+                    return ctx
+        
+        # Wait for available context
+        try:
+            async with self._available:
+                await asyncio.wait_for(
+                    self._wait_for_available(),
+                    timeout=timeout
+                )
+                
+                async with self._lock:
+                    for ctx in self.contexts:
+                        if not ctx["in_use"]:
+                            ctx["in_use"] = True
+                            return ctx
+        except asyncio.TimeoutError:
+            logger.warning("BrowserPool: Timeout waiting for available context")
+            return None
+        
+        return None
+    
+    async def _wait_for_available(self):
+        """Wait for a context to become available."""
+        async with self._available:
+            await self._available.wait()
+    
+    async def release(self, ctx: dict):
+        """Release a browser context back to the pool."""
+        async with self._lock:
+            ctx["in_use"] = False
+            logger.debug(f"BrowserPool: Released context {ctx['worker_id']}")
+        
+        async with self._available:
+            self._available.notify()
+    
+    async def close(self):
+        """Close all browser contexts and the browser."""
+        # Release all accounts
+        for ctx in self.contexts:
+            if ctx.get("account"):
+                await self.account_manager.release(ctx["account"])
+            if ctx.get("page"):
+                await ctx["page"].close()
+            if ctx.get("context"):
+                await ctx["context"].close()
+        
+        if self.browser:
+            await self.browser.close()
+        if self.playwright:
+            await self.playwright.stop()
+        
+        logger.info("BrowserPool: Closed all contexts and browser")
+    
+    async def __aenter__(self):
+        await self.start()
+        return self
+    
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await self.close()
+    
+    def get_stats(self) -> dict:
+        """Get pool statistics."""
+        return {
+            **self.stats,
+            "pool_size": len(self.contexts),
+            "available": sum(1 for c in self.contexts if not c["in_use"]),
+            "in_use": sum(1 for c in self.contexts if c["in_use"]),
+        }
+

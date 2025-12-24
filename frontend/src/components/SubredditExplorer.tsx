@@ -22,10 +22,13 @@ import {
   Shield,
   DollarSign,
   Tag,
+  Flame,
+  Heart,
 } from "lucide-react";
 import {
   getSubredditIntel,
   getSubredditIntelStats,
+  updateSubredditIntelField,
   type SubredditIntel,
   type SubredditIntelFilters,
 } from "@/lib/supabase";
@@ -60,10 +63,25 @@ function getCompetitionLabel(score: number | null): string {
 interface SubredditRowProps {
   subreddit: SubredditIntel;
   index: number;
+  onUpdate: (id: string, field: string, value: any) => void;
 }
 
-function SubredditRow({ subreddit, index }: SubredditRowProps) {
+function SubredditRow({ subreddit, index, onUpdate }: SubredditRowProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isUpdating, setIsUpdating] = useState<string | null>(null);
+
+  const handleFieldUpdate = async (
+    field: "verification_required" | "sellers_allowed" | "content_rating",
+    value: boolean | string | null
+  ) => {
+    setIsUpdating(field);
+    const success = await updateSubredditIntelField(subreddit.id, field, value);
+    setIsUpdating(null);
+    
+    if (success) {
+      onUpdate(subreddit.id, field, value);
+    }
+  };
 
   return (
     <motion.div
@@ -75,7 +93,7 @@ function SubredditRow({ subreddit, index }: SubredditRowProps) {
       <div
         onClick={() => setIsExpanded(!isExpanded)}
         className="grid gap-3 items-center px-4 py-3 hover:bg-white/5 cursor-pointer transition-colors rounded-lg"
-        style={{ gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr 80px 80px" }}
+        style={{ gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr 80px 80px 80px" }}
       >
         {/* Subreddit Name */}
         <div className="flex items-center gap-3 min-w-0">
@@ -152,41 +170,96 @@ function SubredditRow({ subreddit, index }: SubredditRowProps) {
           </div>
         </div>
 
-        {/* Verification Badge */}
+        {/* Verification Badge - Editable */}
         <div className="text-center">
-          {subreddit.verification_required === true ? (
-            <div className="flex items-center justify-center gap-1 text-yellow-400" title="Verification Required">
-              <Shield size={16} />
-              <CheckCircle size={12} />
-            </div>
-          ) : subreddit.verification_required === false ? (
-            <div className="flex items-center justify-center text-muted-foreground/30" title="No Verification">
-              <Shield size={16} />
-            </div>
-          ) : (
-            <div className="flex items-center justify-center text-muted-foreground/20">
-              <HelpCircle size={16} />
-            </div>
-          )}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              const newValue = subreddit.verification_required === true ? false : true;
+              handleFieldUpdate("verification_required", newValue);
+            }}
+            disabled={isUpdating === "verification_required"}
+            className="hover:scale-110 transition-transform disabled:opacity-50"
+          >
+            {isUpdating === "verification_required" ? (
+              <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            ) : subreddit.verification_required === true ? (
+              <div className="flex items-center justify-center gap-1 text-yellow-400" title="Verification Required (click to toggle)">
+                <Shield size={16} />
+                <CheckCircle size={12} />
+              </div>
+            ) : subreddit.verification_required === false ? (
+              <div className="flex items-center justify-center text-muted-foreground/30" title="No Verification (click to toggle)">
+                <Shield size={16} />
+              </div>
+            ) : (
+              <div className="flex items-center justify-center text-muted-foreground/20" title="Unknown (click to set)">
+                <HelpCircle size={16} />
+              </div>
+            )}
+          </button>
         </div>
 
-        {/* Sellers Badge */}
+        {/* Sellers Badge - Editable */}
         <div className="text-center">
-          {subreddit.sellers_allowed === "allowed" ? (
-            <div className="flex items-center justify-center gap-1 text-green-400" title="Sellers Allowed">
-              <DollarSign size={16} />
-              <CheckCircle size={12} />
-            </div>
-          ) : subreddit.sellers_allowed === "not_allowed" ? (
-            <div className="flex items-center justify-center gap-1 text-red-400" title="Sellers Not Allowed">
-              <DollarSign size={16} />
-              <XCircle size={12} />
-            </div>
-          ) : (
-            <div className="flex items-center justify-center text-muted-foreground/20">
-              <HelpCircle size={16} />
-            </div>
-          )}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              const newValue = subreddit.sellers_allowed === "allowed" ? "not_allowed" : "allowed";
+              handleFieldUpdate("sellers_allowed", newValue);
+            }}
+            disabled={isUpdating === "sellers_allowed"}
+            className="hover:scale-110 transition-transform disabled:opacity-50"
+          >
+            {isUpdating === "sellers_allowed" ? (
+              <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            ) : subreddit.sellers_allowed === "allowed" ? (
+              <div className="flex items-center justify-center gap-1 text-green-400" title="Sellers Allowed (click to toggle)">
+                <DollarSign size={16} />
+                <CheckCircle size={12} />
+              </div>
+            ) : subreddit.sellers_allowed === "not_allowed" ? (
+              <div className="flex items-center justify-center gap-1 text-red-400" title="Sellers Not Allowed (click to toggle)">
+                <DollarSign size={16} />
+                <XCircle size={12} />
+              </div>
+            ) : (
+              <div className="flex items-center justify-center text-muted-foreground/20" title="Unknown (click to set)">
+                <HelpCircle size={16} />
+              </div>
+            )}
+          </button>
+        </div>
+
+        {/* Content Rating Badge - Editable */}
+        <div className="text-center">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              const newValue = subreddit.content_rating === "softcore" ? "hardcore" : "softcore";
+              handleFieldUpdate("content_rating", newValue);
+            }}
+            disabled={isUpdating === "content_rating"}
+            className="hover:scale-110 transition-transform disabled:opacity-50"
+          >
+            {isUpdating === "content_rating" ? (
+              <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            ) : subreddit.content_rating === "softcore" ? (
+              <div className="flex items-center justify-center gap-1 text-pink-400" title="Softcore (OF-friendly) - click to toggle">
+                <Heart size={16} />
+                <CheckCircle size={12} />
+              </div>
+            ) : subreddit.content_rating === "hardcore" ? (
+              <div className="flex items-center justify-center gap-1 text-orange-400" title="Hardcore (Explicit) - click to toggle">
+                <Flame size={16} />
+                <XCircle size={12} />
+              </div>
+            ) : (
+              <div className="flex items-center justify-center text-muted-foreground/20" title="Unknown (click to set)">
+                <HelpCircle size={16} />
+              </div>
+            )}
+          </button>
         </div>
       </div>
 
@@ -204,8 +277,9 @@ function SubredditRow({ subreddit, index }: SubredditRowProps) {
               {/* LLM Analysis Section */}
               {(subreddit.verification_required !== null || 
                 subreddit.sellers_allowed !== null || 
+                subreddit.content_rating !== null ||
                 subreddit.niche_categories) && (
-                <div className="grid grid-cols-3 gap-4 pb-4 border-b border-border/30">
+                <div className="grid grid-cols-4 gap-4 pb-4 border-b border-border/30">
                   {/* Verification Required */}
                   <div className="flex items-center gap-2">
                     <Shield size={16} className="text-blue-400" />
@@ -255,6 +329,43 @@ function SubredditRow({ subreddit, index }: SubredditRowProps) {
                           </>
                         )}
                       </div>
+                    </div>
+                  </div>
+
+                  {/* Content Rating */}
+                  <div className="flex items-center gap-2">
+                    {subreddit.content_rating === "softcore" ? (
+                      <Heart size={16} className="text-pink-400" />
+                    ) : subreddit.content_rating === "hardcore" ? (
+                      <Flame size={16} className="text-orange-400" />
+                    ) : (
+                      <HelpCircle size={16} className="text-muted-foreground" />
+                    )}
+                    <div className="flex flex-col">
+                      <span className="text-xs text-muted-foreground">Content</span>
+                      <div className="flex items-center gap-1 font-medium">
+                        {subreddit.content_rating === "softcore" ? (
+                          <>
+                            <CheckCircle size={14} className="text-pink-400" />
+                            <span className="text-pink-400">Softcore</span>
+                          </>
+                        ) : subreddit.content_rating === "hardcore" ? (
+                          <>
+                            <XCircle size={14} className="text-orange-400" />
+                            <span className="text-orange-400">Hardcore</span>
+                          </>
+                        ) : (
+                          <>
+                            <HelpCircle size={14} className="text-muted-foreground" />
+                            <span className="text-muted-foreground">Unknown</span>
+                          </>
+                        )}
+                      </div>
+                      {subreddit.content_rating_reasoning && (
+                        <span className="text-xs text-muted-foreground/70 mt-0.5">
+                          {subreddit.content_rating_reasoning}
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -346,7 +457,7 @@ export function SubredditExplorer() {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const loadingRef = useRef(false); // Prevent duplicate fetches
   const subredditsRef = useRef<SubredditIntel[]>([]); // Track current list
-  const PAGE_SIZE = 50; // Load 50 at a time
+  const PAGE_SIZE = 200; // Load 200 at a time for better performance
 
   // Filters
   const [search, setSearch] = useState("");
@@ -354,6 +465,7 @@ export function SubredditExplorer() {
   const [maxCompetition, setMaxCompetition] = useState<string>("");
   const [verificationFilter, setVerificationFilter] = useState<string>("all"); // all, required, not_required
   const [sellersFilter, setSellersFilter] = useState<string>("all"); // all, allowed, not_allowed
+  const [contentRatingFilter, setContentRatingFilter] = useState<string>("all"); // all, softcore, hardcore
   const [sortBy, setSortBy] = useState<SortField>("weekly_visitors");
   const [sortDesc, setSortDesc] = useState(true);
 
@@ -361,6 +473,15 @@ export function SubredditExplorer() {
   useEffect(() => {
     subredditsRef.current = subreddits;
   }, [subreddits]);
+
+  // Handler for updating subreddit fields locally
+  const handleSubredditUpdate = (id: string, field: string, value: any) => {
+    setSubreddits(prev => 
+      prev.map(sub => 
+        sub.id === id ? { ...sub, [field]: value } : sub
+      )
+    );
+  };
 
   const fetchData = useCallback(async (reset = true) => {
     // Prevent duplicate fetches
@@ -389,6 +510,8 @@ export function SubredditExplorer() {
       if (verificationFilter === "not_required") filters.verificationRequired = false;
       if (sellersFilter === "allowed") filters.sellersAllowed = "allowed";
       if (sellersFilter === "not_allowed") filters.sellersAllowed = "not_allowed";
+      if (contentRatingFilter === "softcore") filters.contentRating = "softcore";
+      if (contentRatingFilter === "hardcore") filters.contentRating = "hardcore";
 
       const offset = reset ? 0 : subredditsRef.current.length;
       
@@ -443,7 +566,7 @@ export function SubredditExplorer() {
   useEffect(() => {
     fetchData(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sortBy, sortDesc, minSubscribers, maxCompetition, verificationFilter, sellersFilter, debouncedSearch]);
+  }, [sortBy, sortDesc, minSubscribers, maxCompetition, verificationFilter, sellersFilter, contentRatingFilter, debouncedSearch]);
   
   // Add scroll listener for infinite scroll
   useEffect(() => {
@@ -481,9 +604,10 @@ export function SubredditExplorer() {
     setMaxCompetition("");
     setVerificationFilter("all");
     setSellersFilter("all");
+    setContentRatingFilter("all");
   };
 
-  const hasActiveFilters = search || minSubscribers || maxCompetition || verificationFilter !== "all" || sellersFilter !== "all";
+  const hasActiveFilters = search || minSubscribers || maxCompetition || verificationFilter !== "all" || sellersFilter !== "all" || contentRatingFilter !== "all";
 
   return (
     <div className="space-y-6">
@@ -585,7 +709,7 @@ export function SubredditExplorer() {
             className="overflow-hidden"
           >
             <div className="bg-card rounded-xl p-4 border border-border">
-              <div className="grid grid-cols-4 gap-4 mb-4">
+              <div className="grid grid-cols-5 gap-4 mb-4">
                 <div>
                   <label className="text-sm text-muted-foreground mb-1 block">
                     Min Subscribers
@@ -641,6 +765,21 @@ export function SubredditExplorer() {
                     <option value="not_allowed">Not Allowed</option>
                   </select>
                 </div>
+                <div>
+                  <label className="text-sm text-muted-foreground mb-1 block flex items-center gap-1">
+                    <Heart size={14} />
+                    Content Rating
+                  </label>
+                  <select
+                    value={contentRatingFilter}
+                    onChange={(e) => setContentRatingFilter(e.target.value)}
+                    className="w-full px-3 py-2 bg-secondary rounded-lg border border-border focus:border-primary focus:outline-none"
+                  >
+                    <option value="all">All</option>
+                    <option value="softcore">Softcore (OF-friendly)</option>
+                    <option value="hardcore">Hardcore (Explicit)</option>
+                  </select>
+                </div>
               </div>
               <div className="flex items-center justify-end">
                 <button
@@ -660,7 +799,7 @@ export function SubredditExplorer() {
         {/* Table Header */}
         <div 
           className="grid gap-3 items-center px-4 py-3 bg-secondary/50 border-b border-border text-sm font-medium text-muted-foreground"
-          style={{ gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr 80px 80px" }}
+          style={{ gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr 80px 80px 80px" }}
         >
           <div>Subreddit</div>
           <div className="text-center">
@@ -680,6 +819,9 @@ export function SubredditExplorer() {
           </div>
           <div className="text-center flex items-center justify-center gap-1" title="Sellers Allowed">
             <DollarSign size={14} />
+          </div>
+          <div className="text-center flex items-center justify-center gap-1" title="Content Rating">
+            <Heart size={14} />
           </div>
         </div>
 
@@ -701,7 +843,12 @@ export function SubredditExplorer() {
           ) : (
             <>
               {subreddits.map((subreddit, index) => (
-                <SubredditRow key={subreddit.id} subreddit={subreddit} index={index} />
+                <SubredditRow 
+                  key={subreddit.id} 
+                  subreddit={subreddit} 
+                  index={index}
+                  onUpdate={handleSubredditUpdate}
+                />
               ))}
               {/* Loading more indicator */}
               {isLoadingMore && (
