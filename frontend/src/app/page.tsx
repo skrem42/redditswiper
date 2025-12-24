@@ -531,6 +531,7 @@ export default function Home() {
                       <SwipeCard
                         key={currentLead.id}
                         lead={currentLead}
+                        nextLeads={sortedLeads.slice(currentIndex + 1, currentIndex + 4)}
                         onSwipe={handleSwipe}
                         onSuperLike={handleSuperLike}
                         isActive={true}

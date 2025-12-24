@@ -7,17 +7,19 @@ import type { RedditLead } from "@/lib/supabase";
 
 interface SwipeCardProps {
   lead: RedditLead;
+  nextLeads?: RedditLead[]; // Next leads to preload images for
   onSwipe: (direction: "left" | "right") => void;
   onSuperLike?: () => void;
   isActive: boolean;
 }
 
-export function SwipeCard({ lead, onSwipe, onSuperLike, isActive }: SwipeCardProps) {
+export function SwipeCard({ lead, nextLeads = [], onSwipe, onSuperLike, isActive }: SwipeCardProps) {
   const [exitDirection, setExitDirection] = useState<"left" | "right" | "up" | null>(null);
   const [carouselIndex, setCarouselIndex] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set());
+  const [isScrolling, setIsScrolling] = useState(false);
   const x = useMotionValue(0);
   const rotate = useTransform(x, [-300, 0, 300], [-15, 0, 15]);
   const opacity = useTransform(x, [-300, -100, 0, 100, 300], [0.5, 1, 1, 1, 0.5]);
@@ -117,14 +119,27 @@ export function SwipeCard({ lead, onSwipe, onSuperLike, isActive }: SwipeCardPro
     return url;
   };
 
-  // Preload only FIRST page images for speed
+  // Preload first page + next leads' images for smooth transitions
   useEffect(() => {
+    // Preload current lead's first page
     const firstPageUrls = mediaUrls.slice(0, isMobile ? 2 : 3);
     firstPageUrls.forEach((url) => {
       const img = new window.Image();
       img.src = getOptimizedUrl(url);
     });
-  }, [mediaUrls, isMobile]);
+    
+    // Preload next 2-3 leads' first 2 images each
+    nextLeads.slice(0, 3).forEach((nextLead) => {
+      if (!nextLead.reddit_posts) return;
+      const nextUrls = nextLead.reddit_posts
+        .flatMap(p => p.media_urls || [])
+        .slice(0, 2);
+      nextUrls.forEach((url) => {
+        const img = new window.Image();
+        img.src = getOptimizedUrl(url);
+      });
+    });
+  }, [mediaUrls, isMobile, nextLeads]);
 
   // Calculate carousel pages (3 images per page on desktop, 2 on mobile)
   const IMAGES_PER_PAGE = isMobile ? 2 : 3;
@@ -186,7 +201,21 @@ export function SwipeCard({ lead, onSwipe, onSuperLike, isActive }: SwipeCardPro
     return { accountAge, accountDays, postsPerDay, avgUpvotes };
   }, [lead.account_created_at, lead.total_posts, lead.posting_frequency, lead.reddit_posts]);
 
+  const handleDragStart = (_: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+    // Check if this is primarily a vertical drag (scrolling) vs horizontal (swiping)
+    const isVertical = Math.abs(info.delta.y) > Math.abs(info.delta.x);
+    if (isVertical && isMobile) {
+      setIsScrolling(true);
+    }
+  };
+
   const handleDragEnd = (_: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+    // If user was scrolling, don't trigger swipe
+    if (isScrolling) {
+      setIsScrolling(false);
+      return;
+    }
+    
     // Lower threshold for mobile - also consider velocity
     const threshold = isMobile ? 80 : 150;
     const velocityThreshold = 300;
@@ -294,11 +323,12 @@ export function SwipeCard({ lead, onSwipe, onSuperLike, isActive }: SwipeCardPro
         </div>
 
         <motion.div
-          className="relative w-full max-w-xl mx-auto bg-card rounded-2xl card-shadow overflow-hidden cursor-grab active:cursor-grabbing md:mt-0 mt-20 touch-pan-y"
+          className="relative w-full max-w-xl mx-auto bg-card rounded-2xl card-shadow overflow-hidden cursor-grab active:cursor-grabbing md:mt-0 mt-20"
           style={{ x, rotate, opacity }}
-          drag={isActive ? "x" : false}
+          drag={isActive && !isScrolling ? "x" : false}
           dragConstraints={{ left: 0, right: 0 }}
           dragElastic={0.9}
+          onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
           whileTap={{ scale: 0.98 }}
         >
@@ -316,11 +346,8 @@ export function SwipeCard({ lead, onSwipe, onSuperLike, isActive }: SwipeCardPro
             YES!
           </motion.div>
 
-          {/* Content area - scrollable on mobile */}
-          <div 
-            className="max-h-[calc(100vh-180px)] md:max-h-none overflow-y-auto overscroll-contain"
-            onPointerDownCapture={(e) => e.stopPropagation()}
-          >
+          {/* Content area - structured for mobile */}
+          <div className="flex flex-col max-h-[calc(100vh-200px)] md:max-h-none">
             {/* Image Carousel - more compact on mobile */}
             {mediaUrls.length > 0 ? (
               <div className="relative bg-black/30 p-1.5 md:p-2">
@@ -446,6 +473,12 @@ export function SwipeCard({ lead, onSwipe, onSuperLike, isActive }: SwipeCardPro
               </div>
             </div>
 
+            {/* Scrollable content section - includes badges, user info, bio, links */}
+            <div 
+              className="flex-1 max-h-[240px] md:max-h-none overflow-y-auto overscroll-contain md:overflow-visible touch-pan-y scroll-smooth"
+              onTouchStart={() => setIsScrolling(true)}
+              onTouchEnd={() => setTimeout(() => setIsScrolling(false), 100)}
+            >
             {/* Indicator Badges Row - More compact on mobile */}
             <div className="grid grid-cols-4 gap-1.5 md:gap-2 p-2 md:p-3 bg-secondary/20">
               <div className={`rounded-lg p-1.5 md:p-2 text-center ${
@@ -493,7 +526,7 @@ export function SwipeCard({ lead, onSwipe, onSuperLike, isActive }: SwipeCardPro
               </div>
             </div>
 
-            {/* User Info Section - Compact on mobile */}
+            {/* User Info Section */}
             <div className="p-3 md:p-4 space-y-2 md:space-y-3">
               {/* Header with avatar and username */}
               <div className="flex items-center gap-2 md:gap-3">
@@ -555,9 +588,9 @@ export function SwipeCard({ lead, onSwipe, onSuperLike, isActive }: SwipeCardPro
                 </div>
               )}
 
-              {/* Bio - truncated on mobile */}
+              {/* Bio - full text, scrollable in container */}
               {lead.bio && (
-                <p className="text-xs md:text-sm text-muted-foreground bg-secondary/30 rounded-lg p-2 md:p-3 line-clamp-2 md:line-clamp-none">
+                <p className="text-xs md:text-sm text-muted-foreground bg-secondary/30 rounded-lg p-2 md:p-3">
                   {lead.bio}
                 </p>
               )}
@@ -618,6 +651,7 @@ export function SwipeCard({ lead, onSwipe, onSuperLike, isActive }: SwipeCardPro
                 )}
               </div>
             </div>
+            </div>{/* End scrollable content section */}
           </div>
 
           {/* Desktop Action buttons - hidden on mobile */}

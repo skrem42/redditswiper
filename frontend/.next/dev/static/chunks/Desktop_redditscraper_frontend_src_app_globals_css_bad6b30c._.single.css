@@ -614,6 +614,14 @@ img, video {
   max-height: calc(100vh - 180px);
 }
 
+.max-h-\[calc\(100vh-200px\)\] {
+  max-height: calc(100vh - 200px);
+}
+
+.max-h-\[240px\] {
+  max-height: 240px;
+}
+
 .min-h-\[400px\] {
   min-height: 400px;
 }
@@ -914,6 +922,10 @@ img, video {
 
 .overscroll-contain {
   overscroll-behavior: contain;
+}
+
+.scroll-smooth {
+  scroll-behavior: smooth;
 }
 
 .truncate {
@@ -1732,12 +1744,12 @@ img, video {
   opacity: 0;
 }
 
-.opacity-50 {
-  opacity: .5;
-}
-
 .opacity-100 {
   opacity: 1;
+}
+
+.opacity-50 {
+  opacity: .5;
 }
 
 .shadow-2xl {
@@ -2280,6 +2292,10 @@ body {
     --tw-space-y-reverse: 0;
     margin-top: calc(.75rem * calc(1 - var(--tw-space-y-reverse)));
     margin-bottom: calc(.75rem * var(--tw-space-y-reverse));
+  }
+
+  .md\:overflow-visible {
+    overflow: visible;
   }
 
   .md\:rounded-2xl {

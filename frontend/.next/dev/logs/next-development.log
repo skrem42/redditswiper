@@ -26,3 +26,70 @@ Incoming: %s useEffect [https://preview.redd.it/5r5urutm1f8g1.jpg?width=2316&for
 [00:23:18.415] Server  LOG     ✓ Compiled in 40ms
 [00:23:36.569] Server  LOG     ✓ Compiled in 62ms
 [00:23:45.427] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[01:41:58.634] Server  LOG     ✓ Compiled in 304ms
+[01:42:09.048] Server  LOG     ✓ Compiled in 45ms
+[01:42:09.143] Browser ERROR   The final argument passed to %s changed size between renders. The order and size of this array must remain constant.
+
+Previous: %s
+Incoming: %s useEffect [https://external-preview.redd.it/zQ3krS3Uik5wr8VhzirMrFlFmRBcbyl09UJ5vorCOmo.jpeg?auto=webp&s=35ad122ef04cec906728b205bd78785e59a52d2d,https://external-preview.redd.it/knFfIpOuBwrECpbaviMiFxgBJc0mKoEPrual3GWkpyA.jpeg?auto=webp&s=61eed6052d7a80709e41208525459b04845df133,https://external-preview.redd.it/EfIrf10_uMgHJOrlD3TWSOKBNTWvbxk7DQOWsZO-4e8.jpeg?auto=webp&s=aab14b430beb7639b2520bf8c90ec623849fad70,https://external-preview.redd.it/l0l60QXvbGhPDVaqkUnoe08ddNDhHMuvRyfLcCvyhvg.jpeg?auto=webp&s=087d93a79b9099b01804efaf9170ab537eb7a67b,https://external-preview.redd.it/a0swqUT-F3wQ3lOBK-_CdmFGxmXskCrecGO5CrqBpe4.jpeg?auto=webp&s=38d5d196c0dfd2dd21a8593c3d3d4990647347a0,https://external-preview.redd.it/PikCmBpVScV6iQUkiUSkgh-rWRz0beaxuwhn2nohj-4.jpeg?auto=webp&s=980034d97abd2a00ffdfc23d86fd44eca4bcafb8,https://external-preview.redd.it/UR5O5B6jXiGz1rzFlNR8KkREtVVqd_lCGq1qKFm5Xsw.jpg?auto=webp&s=4ecb2c2ea35034c9ec3f0b1202a66fb667c47bd6,https://external-preview.redd.it/8NYueTjN2-LVgnYx1X_YtCj2TPLnwg88FTT2YfR1vCA.jpeg?auto=webp&s=dfc3a75f0408591b8658d476fb76b8780f43f87d,https://external-preview.redd.it/G3x5CwkuZWg1OVE4IU5U7Ls6Zp96zsONs0avoHU2z5A.jpeg?auto=webp&s=5b1460a5855402a07c62c54fe9bea08ec22ebe4c,https://external-preview.redd.it/44dJ8hfs7LE1hkoG6Wnxx4bm_k5iYj4u00eML0wdl1Y.jpg?auto=webp&s=390440cb0107c3ceab569c5fe39a900c2e7e9dfc,https://external-preview.redd.it/1xTTETJIZ53ejPCYiorir57rfMQDx9198TpNxOqqKsg.jpeg?auto=webp&s=b507543b445ad42fc27149218478d4ac6a74b3fa,https://external-preview.redd.it/FopbSaGdP9en_KEry3MK9YLOrkvTEGhkXNIi3CkK4n8.jpeg?auto=webp&s=2340c315126260bda085aee74619b2ae9268bd70, true] [https://external-preview.redd.it/zQ3krS3Uik5wr8VhzirMrFlFmRBcbyl09UJ5vorCOmo.jpeg?auto=webp&s=35ad122ef04cec906728b205bd78785e59a52d2d,https://external-preview.redd.it/knFfIpOuBwrECpbaviMiFxgBJc0mKoEPrual3GWkpyA.jpeg?auto=webp&s=61eed6052d7a80709e41208525459b04845df133,https://external-preview.redd.it/EfIrf10_uMgHJOrlD3TWSOKBNTWvbxk7DQOWsZO-4e8.jpeg?auto=webp&s=aab14b430beb7639b2520bf8c90ec623849fad70,https://external-preview.redd.it/l0l60QXvbGhPDVaqkUnoe08ddNDhHMuvRyfLcCvyhvg.jpeg?auto=webp&s=087d93a79b9099b01804efaf9170ab537eb7a67b,https://external-preview.redd.it/a0swqUT-F3wQ3lOBK-_CdmFGxmXskCrecGO5CrqBpe4.jpeg?auto=webp&s=38d5d196c0dfd2dd21a8593c3d3d4990647347a0,https://external-preview.redd.it/PikCmBpVScV6iQUkiUSkgh-rWRz0beaxuwhn2nohj-4.jpeg?auto=webp&s=980034d97abd2a00ffdfc23d86fd44eca4bcafb8,https://external-preview.redd.it/UR5O5B6jXiGz1rzFlNR8KkREtVVqd_lCGq1qKFm5Xsw.jpg?auto=webp&s=4ecb2c2ea35034c9ec3f0b1202a66fb667c47bd6,https://external-preview.redd.it/8NYueTjN2-LVgnYx1X_YtCj2TPLnwg88FTT2YfR1vCA.jpeg?auto=webp&s=dfc3a75f0408591b8658d476fb76b8780f43f87d,https://external-preview.redd.it/G3x5CwkuZWg1OVE4IU5U7Ls6Zp96zsONs0avoHU2z5A.jpeg?auto=webp&s=5b1460a5855402a07c62c54fe9bea08ec22ebe4c,https://external-preview.redd.it/44dJ8hfs7LE1hkoG6Wnxx4bm_k5iYj4u00eML0wdl1Y.jpg?auto=webp&s=390440cb0107c3ceab569c5fe39a900c2e7e9dfc,https://external-preview.redd.it/1xTTETJIZ53ejPCYiorir57rfMQDx9198TpNxOqqKsg.jpeg?auto=webp&s=b507543b445ad42fc27149218478d4ac6a74b3fa,https://external-preview.redd.it/FopbSaGdP9en_KEry3MK9YLOrkvTEGhkXNIi3CkK4n8.jpeg?auto=webp&s=2340c315126260bda085aee74619b2ae9268bd70, true, ]
+[01:42:40.547] Server  LOG     ✓ Compiled in 47ms
+[01:42:53.032] Server  LOG     ✓ Compiled in 50ms
+[01:43:02.456] Server  LOG     ✓ Compiled in 64ms
+[01:43:25.457] Server  LOG     ✓ Compiled in 65ms
+[01:43:37.520] Server  LOG     ✓ Compiled in 41ms
+[01:43:49.549] Server  LOG     ✓ Compiled in 66ms
+[01:43:49.653] Browser ERROR   ./Desktop/redditscraper/frontend/src/components/SwipeCard.tsx:697:22
+Parsing ecmascript source code failed
+  695 |             </button>
+  696 |           </div>
+> 697 |         </motion.div>
+      |                      ^
+> 698 |       </motion.div>
+      | ^^^^^^^
+  699 |
+  700 |       {/* Lightbox for full-size image preview */}
+  701 |       <AnimatePresence>
+
+Expected '</', got 'jsx text (
+      )'
+
+Import traces:
+  Client Component Browser:
+    ./Desktop/redditscraper/frontend/src/components/SwipeCard.tsx [Client Component Browser]
+    ./Desktop/redditscraper/frontend/src/app/page.tsx [Client Component Browser]
+    ./Desktop/redditscraper/frontend/src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./Desktop/redditscraper/frontend/src/components/SwipeCard.tsx [Client Component SSR]
+    ./Desktop/redditscraper/frontend/src/app/page.tsx [Client Component SSR]
+    ./Desktop/redditscraper/frontend/src/app/page.tsx [Server Component]
+[01:43:57.210] Browser ERROR   ./Desktop/redditscraper/frontend/src/components/SwipeCard.tsx:688:22
+Parsing ecmascript source code failed
+  686 |             </button>
+  687 |           </div>
+> 688 |         </motion.div>
+      |                      ^
+> 689 |       </motion.div>
+      | ^^^^^^^
+  690 |
+  691 |       {/* Lightbox for full-size image preview */}
+  692 |       <AnimatePresence>
+
+Expected '</', got 'jsx text (
+      )'
+
+Import traces:
+  Client Component Browser:
+    ./Desktop/redditscraper/frontend/src/components/SwipeCard.tsx [Client Component Browser]
+    ./Desktop/redditscraper/frontend/src/app/page.tsx [Client Component Browser]
+    ./Desktop/redditscraper/frontend/src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./Desktop/redditscraper/frontend/src/components/SwipeCard.tsx [Client Component SSR]
+    ./Desktop/redditscraper/frontend/src/app/page.tsx [Client Component SSR]
+    ./Desktop/redditscraper/frontend/src/app/page.tsx [Server Component]
+[01:44:16.568] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[01:45:05.082] Browser LOG     Scrollable 0: scrollHeight=276, clientHeight=276
+[01:45:30.902] Server  LOG     ✓ Compiled in 164ms
+[01:45:43.239] Server  LOG     ✓ Compiled in 52ms
+[01:45:48.659] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
