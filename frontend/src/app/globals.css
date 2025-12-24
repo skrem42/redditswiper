@@ -119,9 +119,11 @@ body {
     -webkit-tap-highlight-color: transparent;
   }
   
-  /* Smooth scrolling */
+  /* Smooth scrolling for overflow containers */
   .overflow-y-auto {
     -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+    overscroll-behavior: contain;
   }
 }
 

@@ -93,3 +93,66 @@ Import traces:
 [01:45:30.902] Server  LOG     ✓ Compiled in 164ms
 [01:45:43.239] Server  LOG     ✓ Compiled in 52ms
 [01:45:48.659] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[01:52:58.080] Server  LOG     ✓ Compiled in 188ms
+[01:53:13.765] Server  LOG     ✓ Compiled in 419ms
+[01:53:13.913] Browser ERROR   uncaughtError: ReferenceError: handleDragStart is not defined
+[01:53:24.684] Server  WARN    ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+[01:53:24.688] Server  LOG     ✓ Compiled in 183ms
+[01:53:25.656] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[01:53:27.660] Browser ERROR   uncaughtError: ReferenceError: isScrolling is not defined
+[01:53:33.748] Server  WARN    ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+[01:53:33.762] Server  LOG     ✓ Compiled in 218ms
+[01:53:34.300] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[01:53:44.091] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[01:54:59.538] Server  LOG     ✓ Compiled in 84ms
+[01:55:17.996] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[01:55:58.886] Server  LOG     ✓ Compiled in 1371ms
+[01:55:59.041] Browser ERROR   ./Desktop/redditscraper/frontend/src/components/SwipeCard.tsx:643:19
+Parsing ecmascript source code failed
+  641 |               </div>
+  642 |             </div>
+> 643 |             </div>{/* End scrollable content section */}
+      |                   ^
+  644 |           </div>
+  645 |
+  646 |           {/* Desktop Action buttons - hidden on mobile */}
+
+Expected '</', got '{'
+
+Import traces:
+  Client Component Browser:
+    ./Desktop/redditscraper/frontend/src/components/SwipeCard.tsx [Client Component Browser]
+    ./Desktop/redditscraper/frontend/src/app/page.tsx [Client Component Browser]
+    ./Desktop/redditscraper/frontend/src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./Desktop/redditscraper/frontend/src/components/SwipeCard.tsx [Client Component SSR]
+    ./Desktop/redditscraper/frontend/src/app/page.tsx [Client Component SSR]
+    ./Desktop/redditscraper/frontend/src/app/page.tsx [Server Component]
+[01:56:13.464] Server  LOG     ✓ Compiled in 340ms
+[01:56:27.995] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[01:57:17.974] Server  LOG     ✓ Compiled in 285ms
+[01:57:18.078] Browser ERROR   ./Desktop/redditscraper/frontend/src/components/SwipeCard.tsx:644:26
+Parsing ecmascript source code failed
+  642 |               </div>
+  643 |             </div>
+> 644 |             </motion.div>{/* End scrollable content section */}
+      |                          ^
+  645 |           </div>
+  646 |
+  647 |           {/* Desktop Action buttons - hidden on mobile */}
+
+Expected '</', got '{'
+
+Import traces:
+  Client Component Browser:
+    ./Desktop/redditscraper/frontend/src/components/SwipeCard.tsx [Client Component Browser]
+    ./Desktop/redditscraper/frontend/src/app/page.tsx [Client Component Browser]
+    ./Desktop/redditscraper/frontend/src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./Desktop/redditscraper/frontend/src/components/SwipeCard.tsx [Client Component SSR]
+    ./Desktop/redditscraper/frontend/src/app/page.tsx [Client Component SSR]
+    ./Desktop/redditscraper/frontend/src/app/page.tsx [Server Component]
+[01:57:35.949] Server  LOG     ✓ Compiled in 1254ms
+[01:57:45.923] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold

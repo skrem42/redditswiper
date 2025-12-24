@@ -19,7 +19,6 @@ export function SwipeCard({ lead, nextLeads = [], onSwipe, onSuperLike, isActive
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set());
-  const [isScrolling, setIsScrolling] = useState(false);
   const x = useMotionValue(0);
   const rotate = useTransform(x, [-300, 0, 300], [-15, 0, 15]);
   const opacity = useTransform(x, [-300, -100, 0, 100, 300], [0.5, 1, 1, 1, 0.5]);
@@ -201,21 +200,7 @@ export function SwipeCard({ lead, nextLeads = [], onSwipe, onSuperLike, isActive
     return { accountAge, accountDays, postsPerDay, avgUpvotes };
   }, [lead.account_created_at, lead.total_posts, lead.posting_frequency, lead.reddit_posts]);
 
-  const handleDragStart = (_: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
-    // Check if this is primarily a vertical drag (scrolling) vs horizontal (swiping)
-    const isVertical = Math.abs(info.delta.y) > Math.abs(info.delta.x);
-    if (isVertical && isMobile) {
-      setIsScrolling(true);
-    }
-  };
-
   const handleDragEnd = (_: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
-    // If user was scrolling, don't trigger swipe
-    if (isScrolling) {
-      setIsScrolling(false);
-      return;
-    }
-    
     // Lower threshold for mobile - also consider velocity
     const threshold = isMobile ? 80 : 150;
     const velocityThreshold = 300;
@@ -325,10 +310,9 @@ export function SwipeCard({ lead, nextLeads = [], onSwipe, onSuperLike, isActive
         <motion.div
           className="relative w-full max-w-xl mx-auto bg-card rounded-2xl card-shadow overflow-hidden cursor-grab active:cursor-grabbing md:mt-0 mt-20"
           style={{ x, rotate, opacity }}
-          drag={isActive && !isScrolling ? "x" : false}
+          drag={isActive ? "x" : false}
           dragConstraints={{ left: 0, right: 0 }}
           dragElastic={0.9}
-          onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
           whileTap={{ scale: 0.98 }}
         >
@@ -473,11 +457,17 @@ export function SwipeCard({ lead, nextLeads = [], onSwipe, onSuperLike, isActive
               </div>
             </div>
 
-            {/* Scrollable content section - includes badges, user info, bio, links */}
+            {/* Scrollable content section - MUST capture touch before parent drag */}
             <div 
-              className="flex-1 max-h-[240px] md:max-h-none overflow-y-auto overscroll-contain md:overflow-visible touch-pan-y scroll-smooth"
-              onTouchStart={() => setIsScrolling(true)}
-              onTouchEnd={() => setTimeout(() => setIsScrolling(false), 100)}
+              className="flex-1 max-h-[180px] md:max-h-none overflow-y-auto overscroll-y-contain md:overflow-visible relative z-10"
+              style={{ 
+                touchAction: 'pan-y pinch-zoom',
+                WebkitOverflowScrolling: 'touch',
+                overscrollBehavior: 'contain'
+              } as React.CSSProperties}
+              onPointerDown={(e) => e.stopPropagation()}
+              onTouchStart={(e) => e.stopPropagation()}
+              onTouchMove={(e) => e.stopPropagation()}
             >
             {/* Indicator Badges Row - More compact on mobile */}
             <div className="grid grid-cols-4 gap-1.5 md:gap-2 p-2 md:p-3 bg-secondary/20">

@@ -682,6 +682,10 @@ img, video {
   max-height: 18rem;
 }
 
+.max-h-\[180px\] {
+  max-height: 180px;
+}
+
 .max-h-\[300px\] {
   max-height: 300px;
 }
@@ -702,16 +706,8 @@ img, video {
   max-height: 90vh;
 }
 
-.max-h-\[calc\(100vh-180px\)\] {
-  max-height: calc(100vh - 180px);
-}
-
 .max-h-\[calc\(100vh-200px\)\] {
   max-height: calc(100vh - 200px);
-}
-
-.max-h-\[240px\] {
-  max-height: 240px;
 }
 
 .min-h-\[400px\] {
@@ -871,11 +867,6 @@ img, video {
   cursor: pointer;
 }
 
-.touch-pan-y {
-  --tw-pan-y: pan-y;
-  touch-action: var(--tw-pan-x) var(--tw-pan-y) var(--tw-pinch-zoom);
-}
-
 .resize-none {
   resize: none;
 }
@@ -1012,12 +1003,8 @@ img, video {
   overflow-y: auto;
 }
 
-.overscroll-contain {
-  overscroll-behavior: contain;
-}
-
-.scroll-smooth {
-  scroll-behavior: smooth;
+.overscroll-y-contain {
+  overscroll-behavior-y: contain;
 }
 
 .truncate {
@@ -2026,6 +2013,8 @@ body {
 
   .overflow-y-auto {
     -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+    overscroll-behavior: contain;
   }
 }
 
@@ -2267,13 +2256,6 @@ body {
 
   .md\:mt-1 {
     margin-top: .25rem;
-  }
-
-  .md\:line-clamp-none {
-    -webkit-line-clamp: none;
-    -webkit-box-orient: horizontal;
-    display: block;
-    overflow: visible;
   }
 
   .md\:block {
