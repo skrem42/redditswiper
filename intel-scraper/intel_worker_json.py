@@ -2,32 +2,43 @@
 """
 Subreddit Intel Worker - JSON API Edition
 
-Uses Reddit's JSON API with rotating proxy IPs.
+Uses Reddit's JSON API with rotating proxy IPs and account cookies.
 Much faster and more reliable than Playwright.
 
-Each request gets a NEW IP via unique session ID.
+Each request gets a NEW IP via unique session ID + Reddit session cookies.
 """
 import asyncio
 import random
 import string
 import logging
 import sys
+import json
 from datetime import datetime, timezone
 from typing import Optional, List
+from pathlib import Path
 import httpx
 
 from supabase_client import SupabaseClient
 from config import CRAWLER_MIN_SUBSCRIBERS, BATCH_SIZE, CONCURRENT_SUBREDDITS
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[logging.StreamHandler(sys.stdout)]
-)
+# Configure logging - console + shared errors.log
+log_format = '%(asctime)s - %(levelname)s - %(message)s'
+
+console_handler = logging.StreamHandler(sys.stdout)
+console_handler.setLevel(logging.INFO)
+console_handler.setFormatter(logging.Formatter(log_format))
+
+# Errors-only log (WARNING+) - shared with other workers
+from pathlib import Path
+error_log_path = Path(__file__).parent.parent / "errors.log"
+error_handler = logging.FileHandler(error_log_path)
+error_handler.setLevel(logging.WARNING)
+error_handler.setFormatter(logging.Formatter('[Intel JSON] ' + log_format))
+
+logging.basicConfig(level=logging.INFO, handlers=[console_handler, error_handler])
 logger = logging.getLogger(__name__)
 
-# Suppress noisy httpx/httpcore logs (only show errors)
+# Suppress noisy httpx/httpcore logs
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
 
@@ -55,20 +66,79 @@ class JSONIntelWorker:
         self.worker_id = worker_id or random.randint(1000, 9999)
         self.supabase = SupabaseClient()
         self.proxy = SOAXRotatingProxy()
+        self.accounts = self._load_accounts()
         
         self.stats = {
             "scraped": 0,
             "failed": 0,
             "with_subscribers": 0,
             "with_active_users": 0,
+            "rate_limited": 0,
             "start_time": datetime.now(timezone.utc),
         }
     
+    def _load_accounts(self) -> list:
+        """Load Reddit account cookies from redditaccounts.json.
+        
+        File format: Array of arrays, where each inner array is one account's cookies.
+        """
+        accounts_file = Path(__file__).parent / "redditaccounts.json"
+        try:
+            with open(accounts_file, 'r') as f:
+                all_accounts = json.load(f)
+            
+            result = []
+            for account_cookies in all_accounts:
+                # Each account is an array of cookie objects
+                account = {}
+                for cookie in account_cookies:
+                    name = cookie.get("name", "")
+                    value = cookie.get("value", "")
+                    if name == "reddit_session":
+                        account["reddit_session"] = value
+                    elif name == "token_v2":
+                        account["token_v2"] = value
+                    elif name == "loid":
+                        account["loid"] = value
+                    elif name == "edgebucket":
+                        account["edgebucket"] = value
+                    elif name == "csv":
+                        account["csv"] = value
+                
+                # Only include accounts with authentication
+                if account.get("reddit_session") or account.get("token_v2"):
+                    result.append(account)
+            
+            logger.info(f"Loaded {len(result)} Reddit accounts for authentication")
+            return result if result else [{}]
+        except Exception as e:
+            logger.warning(f"Could not load accounts: {e}")
+            return [{}]
+    
+    def _get_cookie_header(self) -> str:
+        """Get a random account's cookies as a Cookie header string."""
+        account = random.choice(self.accounts)
+        cookies = []
+        # Core authentication cookies
+        if account.get("reddit_session"):
+            cookies.append(f"reddit_session={account['reddit_session']}")
+        if account.get("token_v2"):
+            cookies.append(f"token_v2={account['token_v2']}")
+        # Supporting cookies that help avoid detection
+        if account.get("loid"):
+            cookies.append(f"loid={account['loid']}")
+        if account.get("edgebucket"):
+            cookies.append(f"edgebucket={account['edgebucket']}")
+        if account.get("csv"):
+            cookies.append(f"csv={account['csv']}")
+        return "; ".join(cookies) if cookies else ""
+    
     async def scrape_subreddit(self, subreddit_name: str) -> Optional[dict]:
-        """Scrape a single subreddit using JSON API."""
+        """Scrape a single subreddit using JSON API with authentication."""
         
         url = f"https://www.reddit.com/r/{subreddit_name}/about.json"
         proxy_url = self.proxy.get_proxy_url()  # New IP each time!
+        cookie_header = self._get_cookie_header()  # Random account cookies
         
         try:
             async with httpx.AsyncClient(
@@ -78,9 +148,21 @@ class JSONIntelWorker:
             ) as client:
                 headers = {
                     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                    "Accept": "application/json",
+                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
                     "Accept-Language": "en-US,en;q=0.9",
+                    "Accept-Encoding": "gzip, deflate, br",
+                    "DNT": "1",
+                    "Connection": "keep-alive",
+                    "Upgrade-Insecure-Requests": "1",
+                    "Sec-Fetch-Dest": "document",
+                    "Sec-Fetch-Mode": "navigate",
+                    "Sec-Fetch-Site": "none",
+                    "Sec-Fetch-User": "?1",
                 }
+                
+                # Add cookies if available
+                if cookie_header:
+                    headers["Cookie"] = cookie_header
                 
                 response = await client.get(url, headers=headers)
                 
@@ -108,7 +190,14 @@ class JSONIntelWorker:
                     return data
                 
                 elif response.status_code == 429:
+                    self.stats["rate_limited"] += 1
                     logger.warning(f"Rate limited on r/{subreddit_name}")
+                    return None
+                    
+                elif response.status_code == 403:
+                    # 403 often means cookies expired or Reddit is blocking
+                    # Log but don't count as permanent failure (might work later)
+                    logger.warning(f"HTTP 403 for r/{subreddit_name} (auth issue?)")
                     return None
                     
                 else:
@@ -131,9 +220,9 @@ class JSONIntelWorker:
             return False
     
     async def fetch_queue(self, batch_size: int = 50) -> List[str]:
-        """Fetch subreddits that need scraping."""
+        """Fetch subreddits that need scraping (skip already completed ones)."""
         try:
-            # Get from queue that aren't in intel table yet
+            # Get from queue with high subscribers
             queue_resp = self.supabase.client.table("subreddit_queue") \
                 .select("subreddit_name") \
                 .gte("subscribers", CRAWLER_MIN_SUBSCRIBERS) \
@@ -141,15 +230,17 @@ class JSONIntelWorker:
                 .limit(1000) \
                 .execute()
             
+            # Get subs that ALREADY have subscribers data (completed)
             intel_resp = self.supabase.client.table("nsfw_subreddit_intel") \
                 .select("subreddit_name") \
+                .not_.is_("subscribers", "null") \
                 .execute()
             
             queue_subs = {r["subreddit_name"].lower() for r in queue_resp.data}
-            intel_subs = {r["subreddit_name"].lower() for r in intel_resp.data}
+            completed_subs = {r["subreddit_name"].lower() for r in intel_resp.data}
             
-            # Return subs in queue but not in intel
-            pending = list(queue_subs - intel_subs)[:batch_size]
+            # Return subs in queue but not already completed
+            pending = list(queue_subs - completed_subs)[:batch_size]
             return pending
             
         except Exception as e:

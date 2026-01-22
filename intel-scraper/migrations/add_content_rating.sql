@@ -25,3 +25,9 @@ COMMENT ON COLUMN nsfw_subreddit_intel.content_rating IS 'Content classification
 COMMENT ON COLUMN nsfw_subreddit_intel.content_rating_confidence IS 'Confidence level of the classification: high, medium, or low';
 COMMENT ON COLUMN nsfw_subreddit_intel.content_rating_reasoning IS 'Brief explanation of why the subreddit was classified this way';
 
+
+
+
+
+
+

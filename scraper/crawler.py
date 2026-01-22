@@ -25,10 +25,21 @@ from config import (
 )
 
 # Set up logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
+# Configure logging - console + shared errors.log
+log_format = '%(asctime)s - %(levelname)s - %(message)s'
+
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.INFO)
+console_handler.setFormatter(logging.Formatter(log_format))
+
+# Errors-only log (WARNING+) - shared with other workers
+from pathlib import Path
+error_log_path = Path(__file__).parent.parent / "errors.log"
+error_handler = logging.FileHandler(error_log_path)
+error_handler.setLevel(logging.WARNING)
+error_handler.setFormatter(logging.Formatter('[Crawler] ' + log_format))
+
+logging.basicConfig(level=logging.INFO, handlers=[console_handler, error_handler])
 logger = logging.getLogger(__name__)
 
 

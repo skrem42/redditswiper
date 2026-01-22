@@ -10,8 +10,10 @@ import os
 import json
 import logging
 import asyncio
+import random
 import httpx
 from typing import Optional
+from pathlib import Path
 from openai import AsyncOpenAI
 from dotenv import load_dotenv
 from config import LLM_REDDIT_PROXY, OPENAI_API_KEY
@@ -20,6 +22,41 @@ from config import LLM_REDDIT_PROXY, OPENAI_API_KEY
 load_dotenv("/Users/calummelling/Desktop/redditscraper/scraper/.env")
 
 logger = logging.getLogger(__name__)
+
+
+def _load_reddit_accounts() -> list:
+    """Load Reddit account cookies from redditaccounts.json."""
+    accounts_file = Path(__file__).parent / "redditaccounts.json"
+    try:
+        with open(accounts_file, 'r') as f:
+            all_accounts = json.load(f)
+        
+        result = []
+        for account_cookies in all_accounts:
+            account = {}
+            for cookie in account_cookies:
+                name = cookie.get("name", "")
+                value = cookie.get("value", "")
+                if name == "reddit_session":
+                    account["reddit_session"] = value
+                elif name == "token_v2":
+                    account["token_v2"] = value
+                elif name == "loid":
+                    account["loid"] = value
+                elif name == "edgebucket":
+                    account["edgebucket"] = value
+            
+            if account.get("reddit_session") or account.get("token_v2"):
+                result.append(account)
+        
+        return result if result else [{}]
+    except Exception as e:
+        logger.warning(f"Could not load accounts: {e}")
+        return [{}]
+
+
+# Load accounts once at module level
+REDDIT_ACCOUNTS = _load_reddit_accounts()
 
 
 class SubredditLLMAnalyzer:
@@ -45,16 +82,39 @@ class SubredditLLMAnalyzer:
         logger.info(f"  - Reddit API proxy: {self.reddit_proxy[:40]}..." if self.reddit_proxy else "  - Reddit API proxy: None")
         logger.info(f"  - OpenAI API: Direct connection (no proxy)")
     
+    def _get_cookie_header(self) -> str:
+        """Get a random account's cookies as a Cookie header string."""
+        account = random.choice(REDDIT_ACCOUNTS)
+        cookies = []
+        if account.get("reddit_session"):
+            cookies.append(f"reddit_session={account['reddit_session']}")
+        if account.get("token_v2"):
+            cookies.append(f"token_v2={account['token_v2']}")
+        if account.get("loid"):
+            cookies.append(f"loid={account['loid']}")
+        if account.get("edgebucket"):
+            cookies.append(f"edgebucket={account['edgebucket']}")
+        return "; ".join(cookies) if cookies else ""
+
     async def _fetch_recent_posts(self, subreddit_name: str, limit: int = 10) -> list:
         """Fetch recent posts from subreddit to analyze posting patterns."""
         url = f"https://www.reddit.com/r/{subreddit_name}/new.json?limit={limit}"
         
-        # Use better headers to avoid Reddit blocks
+        # Use browser-like headers with cookies to avoid Reddit blocks
+        cookie_header = self._get_cookie_header()
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Accept": "application/json",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
             "Accept-Language": "en-US,en;q=0.9",
+            "Accept-Encoding": "gzip, deflate, br",
+            "DNT": "1",
+            "Connection": "keep-alive",
+            "Sec-Fetch-Dest": "document",
+            "Sec-Fetch-Mode": "navigate",
+            "Sec-Fetch-Site": "none",
         }
+        if cookie_header:
+            headers["Cookie"] = cookie_header
         
         # Retry with backoff and IP rotation
         max_retries = 3
@@ -115,11 +175,21 @@ class SubredditLLMAnalyzer:
         """Fetch user profile to check for seller indicators."""
         url = f"https://www.reddit.com/user/{username}/about.json"
         
+        # Use browser-like headers with cookies
+        cookie_header = self._get_cookie_header()
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Accept": "application/json",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
             "Accept-Language": "en-US,en;q=0.9",
+            "Accept-Encoding": "gzip, deflate, br",
+            "DNT": "1",
+            "Connection": "keep-alive",
+            "Sec-Fetch-Dest": "document",
+            "Sec-Fetch-Mode": "navigate",
+            "Sec-Fetch-Site": "none",
         }
+        if cookie_header:
+            headers["Cookie"] = cookie_header
         
         # Retry with backoff and IP rotation
         max_retries = 3

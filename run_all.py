@@ -24,14 +24,27 @@ import logging
 from datetime import datetime
 from pathlib import Path
 
-# Setup logging
+# Setup logging - main log (all messages) + errors-only log
+log_format = '%(asctime)s [%(levelname)s] %(message)s'
+
+# Main log handler (INFO+)
+main_handler = logging.FileHandler('run_all.log')
+main_handler.setLevel(logging.INFO)
+main_handler.setFormatter(logging.Formatter(log_format))
+
+# Errors-only log handler (WARNING+)
+error_handler = logging.FileHandler('errors.log')
+error_handler.setLevel(logging.WARNING)
+error_handler.setFormatter(logging.Formatter(log_format))
+
+# Console handler
+console_handler = logging.StreamHandler(sys.stdout)
+console_handler.setLevel(logging.INFO)
+console_handler.setFormatter(logging.Formatter(log_format))
+
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s [%(levelname)s] %(message)s',
-    handlers=[
-        logging.FileHandler('run_all.log'),
-        logging.StreamHandler(sys.stdout)
-    ]
+    handlers=[main_handler, error_handler, console_handler]
 )
 logger = logging.getLogger(__name__)
 

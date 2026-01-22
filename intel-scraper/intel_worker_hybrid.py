@@ -30,15 +30,24 @@ from config import (
     REDDIT_ACCOUNTS,
 )
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[logging.StreamHandler(sys.stdout)]
-)
+# Configure logging - console + shared errors.log
+log_format = '%(asctime)s - %(levelname)s - %(message)s'
+
+console_handler = logging.StreamHandler(sys.stdout)
+console_handler.setLevel(logging.INFO)
+console_handler.setFormatter(logging.Formatter(log_format))
+
+# Errors-only log (WARNING+) - shared with other workers
+from pathlib import Path
+error_log_path = Path(__file__).parent.parent / "errors.log"
+error_handler = logging.FileHandler(error_log_path)
+error_handler.setLevel(logging.WARNING)
+error_handler.setFormatter(logging.Formatter('[Intel Competition] ' + log_format))
+
+logging.basicConfig(level=logging.INFO, handlers=[console_handler, error_handler])
 logger = logging.getLogger(__name__)
 
-# Suppress noisy httpx/httpcore logs (only show errors)
+# Suppress noisy httpx/httpcore logs
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
 
@@ -293,7 +302,7 @@ class HybridIntelWorker:
                         wc = metrics.get('weekly_contributions', 'N/A')
                         logger.info(f"✓ r/{sub}: {wv} visitors/wk, {wc} posts/wk")
                     else:
-                        logger.info(f"- r/{sub}: No competition data found")
+                        logger.warning(f"r/{sub}: No competition data found")
                     
                     self.stats["scraped"] += 1
                     
